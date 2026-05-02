@@ -1,33 +1,57 @@
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { useState, useCallback } from 'react'
 import Dashboard from './pages/Dashboard'
-import Groups from './pages/Groups'
-import Clubs from './pages/Clubs'
+import Segments from './pages/Segments'
 import CostPerTon from './pages/CostPerTon'
+import Domain from './pages/Domain'
+import Domains from './pages/Domains'
+import Productivity from './pages/Productivity'
+import CostBreakdown from './pages/CostBreakdown'
+import Varieties from './pages/Varieties'
+import Sidebar from './components/Sidebar'
+import Topbar from './components/Topbar'
+import { QnzProvider } from './context/QnzContext'
 import './App.css'
 
-function App() {
+function AppContent() {
+  const [sidebarWidth, setSidebarWidth] = useState(240)
+
+  const handleWidthChange = useCallback((w) => {
+    setSidebarWidth(w)
+  }, [])
+
   return (
     <BrowserRouter>
       <div className="app">
-        <nav className="sidebar">
-          <h1>🌱 Agri Data Lake</h1>
-          <ul>
-            <li><Link to="/">📊 Dashboard</Link></li>
-            <li><Link to="/groups">📁 Groups</Link></li>
-            <li><Link to="/clubs">🏠 Clubs</Link></li>
-            <li><Link to="/cost-per-ton">📈 Cost/Ton</Link></li>
-          </ul>
-        </nav>
-        <main className="content">
+        <Sidebar onWidthChange={handleWidthChange} />
+        <Topbar sidebarWidth={sidebarWidth} />
+        <main
+          className="content"
+          style={{ marginLeft: sidebarWidth }}
+        >
           <Routes>
             <Route path="/" element={<Dashboard />} />
-            <Route path="/groups" element={<Groups />} />
-            <Route path="/clubs" element={<Clubs />} />
+            <Route path="/productivity" element={<Productivity />} />
+            <Route path="/varieties" element={<Varieties />} />
+            <Route path="/domains" element={<Domains />} />
+            <Route path="/segments" element={<Segments />} />
+            <Route path="/groups" element={<Navigate to="/segments" replace />} />
+            <Route path="/clubs" element={<Navigate to="/segments?tab=clubs" replace />} />
             <Route path="/cost-per-ton" element={<CostPerTon />} />
+            <Route path="/cost-breakdown" element={<CostBreakdown />} />
+            <Route path="/domain/:ferme" element={<Domain />} />
           </Routes>
         </main>
       </div>
     </BrowserRouter>
+  )
+}
+
+function App() {
+  return (
+    <QnzProvider>
+      <AppContent />
+    </QnzProvider>
   )
 }
 

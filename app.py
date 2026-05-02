@@ -26,12 +26,13 @@ def load_data():
 
 
 def calculate_cost_per_ton(tonnage_df, costs_df):
+    costs_df = costs_df[costs_df["domain_id"] == 22]
     tonnage_agg = tonnage_df.groupby("ferme")["tonnage"].sum().reset_index()
     tonnage_agg.columns = ["Domaine", "total_tonnage"]
 
     costs_agg = costs_df.groupby("Domaine").agg({
         "Montant Total": "sum",
-        "Super": "sum"
+        "Super": "first"
     }).reset_index()
     costs_agg.columns = ["Domaine", "total_cost", "superficie"]
 
@@ -205,8 +206,9 @@ elif page == "💰 Costs":
         st.bar_chart(cost_breakdown.set_index("Category")["Amount"])
 
     st.subheader("All Domains Cost Summary")
-    cost_summary = costs.groupby("Domaine").agg({
-        "Super": "sum",
+    costs_filtered = costs[costs["domain_id"] == 22]
+    cost_summary = costs_filtered.groupby("Domaine").agg({
+        "Super": "first",
         "Montant Total": "sum",
         "domain_id": "first"
     }).reset_index()

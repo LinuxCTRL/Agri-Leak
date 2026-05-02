@@ -35,11 +35,18 @@ def calculate_qnz(date):
     return qnz, year_start, year_end
 
 
-def ingest_tonnage():
-    """Ingest tonnage data from Excel file."""
-    file_path = DATA_DIR / "30-04-26 V2 -SUIVI JOURNALIER DES TONNAGES  QNZ N° 22.xlsx"
+def parse_qnz_number(filename):
+    """Extract QNZ number from filename like '... QNZ N° 21.xlsx'"""
+    import re
+    match = re.search(r"QNZ\s*N°\s*(\d+)", filename, re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
+
+def ingest_tonnage_file(file_path, qnz_num):
+    """Ingest tonnage data from a single Excel file."""
     xls = pd.ExcelFile(file_path)
-    df = pd.read_excel(xls, sheet_name="SUIVI JOUR, TONNAGE QNZ N° 22", header=3)
+    sheet_name = f"SUIVI JOUR, TONNAGE QNZ N° {qnz_num}"
+    df = pd.read_excel(xls, sheet_name=sheet_name, header=3)
 
     df = df.dropna(subset=["GROUPE", "FERME"])
 
@@ -82,10 +89,31 @@ def ingest_tonnage():
                     "global_tonnage": global_tonnage
                 })
 
-    df_tonnage = pd.DataFrame(records)
-    output_path = PROCESSED_DIR / "tonnage_qnz22.parquet"
+    return pd.DataFrame(records)
+
+
+def ingest_tonnage():
+    """Ingest tonnage data from all QNZ Excel files."""
+    import re
+
+    all_files = list(DATA_DIR.glob("*QNZ*.xlsx"))
+    all_files.sort(key=lambda f: parse_qnz_number(f.name))
+
+    if not all_files:
+        print("No QNZ Excel files found in data/")
+        return pd.DataFrame()
+
+    all_dfs = []
+    for file_path in all_files:
+        qnz_num = parse_qnz_number(file_path.name)
+        print(f"Processing {file_path.name} (QNZ {qnz_num})...")
+        df = ingest_tonnage_file(file_path, qnz_num)
+        all_dfs.append(df)
+
+    df_tonnage = pd.concat(all_dfs, ignore_index=True)
+    output_path = PROCESSED_DIR / "tonnage_combined.parquet"
     df_tonnage.to_parquet(output_path, engine="pyarrow", index=False)
-    print(f"Saved tonnage data: {len(df_tonnage)} rows -> {output_path}")
+    print(f"Saved combined tonnage data: {len(df_tonnage)} rows -> {output_path}")
     return df_tonnage
 
 
