@@ -13,3 +13,4 @@ data
 .kiro
 cost_per_ton.xlsx
 backend/.env
+backend/farm_mapping.json

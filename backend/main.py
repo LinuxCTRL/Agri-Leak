@@ -6,6 +6,7 @@ import pandas as pd
 from pathlib import Path
 from typing import Optional
 import os
+import json
 
 from dotenv import load_dotenv
 load_dotenv()
@@ -25,22 +26,13 @@ app.add_middleware(
 )
 
 # ── Farm Name Normalization ──────────────────────────────────────────
-# Cost data has trailing spaces and spelling differences vs tonnage data.
-# This mapping normalizes cost farm names → tonnage farm names.
-FARM_NAME_MAP = {
-    "BAKHIR ": "BAKHIR",
-    "ADOUZ ": "ADOUZ",
-    "AGLOU ": "AGLOU",
-    "TOUFLIHT ": "TOUFLIHT",
-    "TOUJANA ": "TOUJANA",
-    "SAMOURA ": "SAMORA",
-    "TIN ADDI ": "TIN ADDI",
-    "TIN MANSOUR": "TIN MANSOR",
-    "TOUG RIH": "TOUGRIH",
-    "EL KASABA": "ALKASSABA",
-    "TAKAD ": "TAKAD 1",
-    "IFRIANE": "IFERYAN",
-}
+# Load normalization mapping from external config to prevent source leakage.
+CONFIG_PATH = Path(__file__).parent / "farm_mapping.json"
+if CONFIG_PATH.exists():
+    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+        FARM_NAME_MAP = json.load(f)
+else:
+    FARM_NAME_MAP = {}
 
 
 def normalize_farm_name(name):
@@ -688,14 +680,15 @@ Tonnage by farm and QNZ (sample):
 
 Cost data covers: {sorted(costs_df["Domaine"].unique().tolist())[:10]}...
 
-DATA SCHEMA:
+DATA_SCHEMA:
 - tonnage table: ferme (farm name), group, club, code, variety, type, serre, superficie (ha), plant_date, date, qnz, year_start, year_end, tonnage (kg), global_tonnage
 - costs table: Domaine (farm name), Super (surface ha), Main D'oeuvrs, ECHASSIER, Poste Fixe, Dépences externe, Autre Dépences interne, Montant Total, domain_id, qnz
 
 IMPORTANT: When user asks about a specific farm in a specific QNZ, filter by both ferme and qnz columns.
-For example: "TASSAOUT at QNZ 21" means filter where ferme == "TASSAOUT" and qnz == 21, then sum tonnage.
+For example: "FARM_NAME at QNZ 21" means filter where ferme == "FARM_NAME" and qnz == 21, then sum tonnage.
 
 Answer questions about tonnage, costs, productivity, farms, varieties, groups, clubs, and specific QNZ periods.
+
 Format numbers with commas for thousands. Use kg for tonnage, MAD for costs, ha for superficie.
 Always provide specific numbers from the data when answering.
 """
