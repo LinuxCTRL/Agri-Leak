@@ -10,6 +10,7 @@ import CostBreakdown from './pages/CostBreakdown'
 import Varieties from './pages/Varieties'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
+import ChatPopup from './components/ChatPopup'
 import { QnzProvider } from './context/QnzContext'
 import './App.css'
 
@@ -41,6 +42,7 @@ function AppContent() {
             <Route path="/cost-breakdown" element={<CostBreakdown />} />
             <Route path="/domain/:ferme" element={<Domain />} />
           </Routes>
+          <ChatPopup />
         </main>
       </div>
     </BrowserRouter>

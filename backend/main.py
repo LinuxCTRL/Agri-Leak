@@ -1,9 +1,14 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 import duckdb
 import pandas as pd
 from pathlib import Path
 from typing import Optional
+import os
+
+from dotenv import load_dotenv
+load_dotenv()
 
 DATA_DIR = Path(__file__).parent.parent / "data"
 PROCESSED_DIR = DATA_DIR / "processed"
@@ -623,6 +628,119 @@ def get_domain_details(ferme_name: str, qnz: Optional[int] = None):
         "daily_harvest": daily_harvest,
         "cost": cost_info,
     }
+
+
+# ── AI Chat Endpoint ──────────────────────────────────────────────────────
+
+def build_context():
+    """Build context from datasets for the AI to use."""
+    tonnage_df = get_tonnage_df()
+    costs_df = get_costs_df()
+
+    total_ton = tonnage_df["tonnage"].sum()
+    total_cost = costs_df["Montant Total"].sum()
+    farms = tonnage_df["ferme"].nunique()
+    varieties = tonnage_df["variety"].nunique()
+    groups = tonnage_df["group"].nunique()
+    clubs = tonnage_df["club"].nunique()
+
+    available_qnz = sorted(tonnage_df["qnz"].unique().tolist())
+
+    by_qnz = tonnage_df.groupby("qnz").agg(
+        tonnage=("tonnage", "sum"),
+        farms=("ferme", "nunique"),
+        start_date=("date", "min"),
+        end_date=("date", "max")
+    ).reset_index().sort_values("qnz")
+
+    by_farm = tonnage_df.groupby("ferme")["tonnage"].sum().sort_values(ascending=False)
+    top_farms = by_farm.head(10)
+    all_farms = tonnage_df["ferme"].unique().tolist()
+
+    by_variety = tonnage_df.groupby("variety")["tonnage"].sum().sort_values(ascending=False).head(10)
+
+    by_farm_qnz = tonnage_df.groupby(["ferme", "qnz"])["tonnage"].sum().unstack(fill_value=0)
+
+    context = f"""
+You are an agricultural data analyst for a Moroccan tomato farm data lake.
+Current data:
+- Total tonnage: {total_ton:,.0f} kg
+- Total costs: {total_cost:,.0f} MAD
+- Farms: {farms}
+- Varieties: {varieties}
+- Groups: {groups}
+- Clubs: {clubs}
+- Available QNZ periods: {available_qnz}
+
+Tonnage by QNZ (all farms combined):
+{by_qnz.to_string()}
+
+All farms ({len(all_farms)} total): {all_farms}
+
+Top 10 farms by total tonnage:
+{top_farms.to_string()}
+
+Top 10 varieties by total tonnage:
+{by_variety.to_string()}
+
+Tonnage by farm and QNZ (sample):
+{by_farm_qnz.head(10).to_string()}
+
+Cost data covers: {sorted(costs_df["Domaine"].unique().tolist())[:10]}...
+
+DATA SCHEMA:
+- tonnage table: ferme (farm name), group, club, code, variety, type, serre, superficie (ha), plant_date, date, qnz, year_start, year_end, tonnage (kg), global_tonnage
+- costs table: Domaine (farm name), Super (surface ha), Main D'oeuvrs, ECHASSIER, Poste Fixe, Dépences externe, Autre Dépences interne, Montant Total, domain_id, qnz
+
+IMPORTANT: When user asks about a specific farm in a specific QNZ, filter by both ferme and qnz columns.
+For example: "TASSAOUT at QNZ 21" means filter where ferme == "TASSAOUT" and qnz == 21, then sum tonnage.
+
+Answer questions about tonnage, costs, productivity, farms, varieties, groups, clubs, and specific QNZ periods.
+Format numbers with commas for thousands. Use kg for tonnage, MAD for costs, ha for superficie.
+Always provide specific numbers from the data when answering.
+"""
+    return context
+
+
+@app.post("/api/ai/chat")
+async def chat(request: Request):
+    """Chat with DeepSeek about the agricultural data."""
+    body = await request.json()
+    question = body.get("question", "")
+
+    if not question:
+        return JSONResponse({"error": "Question required"}, status_code=400)
+
+    api_key = os.environ.get("DEEPSEEK_API_KEY")
+    if not api_key:
+        return JSONResponse({"error": "DEEPSEEK_API_KEY not configured"}, status_code=500)
+
+    context = build_context()
+
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.deepseek.com/v1/chat/completions",
+                json={
+                    "model": "deepseek-chat",
+                    "messages": [
+                        {"role": "system", "content": context},
+                        {"role": "user", "content": question}
+                    ],
+                    "temperature": 0.7,
+                },
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                timeout=60.0
+            )
+            result = response.json()
+            answer = result["choices"][0]["message"]["content"]
+            return {"answer": answer}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 if __name__ == "__main__":

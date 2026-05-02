@@ -18,7 +18,8 @@ function ChartContainer({ title, children, data, filename }) {
     img.onload = () => {
       canvas.width = img.width
       canvas.height = img.height
-      ctx.fillStyle = 'white'
+      // Match current theme background
+      ctx.fillStyle = getComputedStyle(document.body).getPropertyValue('--surface') || 'white'
       ctx.fillRect(0, 0, canvas.width, canvas.height)
       ctx.drawImage(img, 0, 0)
       
@@ -51,98 +52,57 @@ function ChartContainer({ title, children, data, filename }) {
     URL.revokeObjectURL(link.href)
   }
 
-  const toggleFullscreen = () => {
+  const toggleFullscreen = (e) => {
+    if (e) e.stopPropagation()
     setIsFullscreen(!isFullscreen)
   }
 
   return (
     <>
-      <div className="chart" ref={chartRef} style={{ position: 'relative' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+      <div className="chart" ref={chartRef}>
+        <div className="chart-container-header">
           <h3 style={{ margin: 0 }}>{title}</h3>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className="chart-actions">
             <button
+              className="chart-action-btn"
               onClick={exportToPNG}
               title="Export as PNG"
-              style={{
-                background: 'none',
-                border: '1px solid var(--border)',
-                borderRadius: 4,
-                padding: '4px 8px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                color: 'var(--text-muted)'
-              }}
-            >📷</button>
+            >
+              📷
+            </button>
             {data && (
               <button
+                className="chart-action-btn"
                 onClick={exportToCSV}
                 title="Export data as CSV"
-                style={{
-                  background: 'none',
-                  border: '1px solid var(--border)',
-                  borderRadius: 4,
-                  padding: '4px 8px',
-                  cursor: 'pointer',
-                  fontSize: '0.8rem',
-                  color: 'var(--text-muted)'
-                }}
-              >📊</button>
+              >
+                📊
+              </button>
             )}
             <button
+              className="chart-action-btn"
               onClick={toggleFullscreen}
               title="Fullscreen"
-              style={{
-                background: 'none',
-                border: '1px solid var(--border)',
-                borderRadius: 4,
-                padding: '4px 8px',
-                cursor: 'pointer',
-                fontSize: '0.8rem',
-                color: 'var(--text-muted)'
-              }}
-            >⛶</button>
+            >
+              ⛶
+            </button>
           </div>
         </div>
-        {children}
+        <div className="chart-content">
+          {children}
+        </div>
       </div>
 
       {/* Fullscreen modal */}
       {isFullscreen && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'rgba(0,0,0,0.9)',
-            zIndex: 1000,
-            display: 'flex',
-            flexDirection: 'column',
-            padding: 20
-          }}
-          onClick={toggleFullscreen}
-        >
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
-            <h2 style={{ color: 'white', margin: 0 }}>{title}</h2>
-            <button
-              onClick={toggleFullscreen}
-              style={{
-                background: 'rgba(255,255,255,0.1)',
-                border: '1px solid rgba(255,255,255,0.3)',
-                borderRadius: 4,
-                padding: '8px 12px',
-                cursor: 'pointer',
-                color: 'white',
-                fontSize: '1rem'
-              }}
-            >✕</button>
+        <div className="chart-fullscreen-overlay" onClick={toggleFullscreen}>
+          <div className="chart-fullscreen-header">
+            <h2 className="chart-fullscreen-title">{title}</h2>
+            <button className="chart-fullscreen-close" onClick={toggleFullscreen}>
+              ✕
+            </button>
           </div>
-          <div
-            style={{ flex: 1, background: 'white', borderRadius: 8, padding: 20 }}
-            onClick={e => e.stopPropagation()}
-          >
+          <div className="chart-fullscreen-content" onClick={e => e.stopPropagation()}>
             {children}
           </div>
         </div>
