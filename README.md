@@ -47,7 +47,7 @@ data-leak/
 ├── scripts/
 │   ├── ingest.py             # Data ingestion pipeline
 │   └── analytics.py         # Analytics queries
-│
+│MIT License — See [LICENSE](LICENSE) for details.
 ├── frontend/                 # React + Vite dashboard
 │   └── src/pages/          # Dashboard, Domains, Varieties, etc.
 │
@@ -230,7 +230,7 @@ npm run dev
 
 ## License
 
-MIT License — See [LICENSE](LICENSE) for details.
+FREE TO USE 
 
 ---
 
