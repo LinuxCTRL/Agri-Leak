@@ -7,6 +7,7 @@ import Domain from './pages/Domain'
 import Domains from './pages/Domains'
 import Productivity from './pages/Productivity'
 import CostBreakdown from './pages/CostBreakdown'
+import Comparison from './pages/Comparison'
 import Varieties from './pages/Varieties'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
@@ -36,6 +37,7 @@ function AppContent() {
             <Route path="/varieties" element={<Varieties />} />
             <Route path="/domains" element={<Domains />} />
             <Route path="/segments" element={<Segments />} />
+            <Route path="/comparison" element={<Comparison />} />
             <Route path="/groups" element={<Navigate to="/segments" replace />} />
             <Route path="/clubs" element={<Navigate to="/segments?tab=clubs" replace />} />
             <Route path="/cost-per-ton" element={<CostPerTon />} />

@@ -129,15 +129,15 @@ function Domain() {
                 <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
                   <div>
                     <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Total Cost</span>
-                    <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'Outfit' }}>{cost.total_cost?.toLocaleString()} MAD</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>{cost.total_cost?.toLocaleString()} MAD</div>
                   </div>
                   <div>
                     <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Cost/Ha</span>
-                    <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'Outfit' }}>{cost.cost_per_ha?.toFixed(0)} MAD</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>{cost.cost_per_ha?.toFixed(0)} MAD</div>
                   </div>
                   <div>
                     <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Cost/Ton</span>
-                    <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent)', fontFamily: 'Outfit' }}>{cost.cost_per_ton?.toFixed(2)} MAD</div>
+                    <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent)', fontFamily: 'var(--font-heading)' }}>{cost.cost_per_ton?.toFixed(2)} MAD</div>
                   </div>
                 </div>
               </div>

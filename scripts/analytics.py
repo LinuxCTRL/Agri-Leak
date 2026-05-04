@@ -8,38 +8,34 @@ conn = duckdb.connect(str(OUTPUT_DIR / "analytics.duckdb"))
 
 conn.execute("DROP TABLE IF EXISTS tonnage")
 conn.execute("DROP TABLE IF EXISTS costs")
-conn.execute("CREATE TABLE tonnage AS SELECT * FROM 'data/processed/tonnage_qnz22.parquet'")
-conn.execute("CREATE TABLE costs AS SELECT * FROM 'data/processed/costs_qnz19_d1_22.parquet'")
+conn.execute("CREATE TABLE tonnage AS SELECT * FROM 'data/processed/tonnage_combined.parquet'")
+conn.execute("CREATE TABLE costs AS SELECT * FROM 'data/processed/costs_combined.parquet'")
 
 print("=" * 60)
-print("AGRICULTURAL DATA LAKE - COST/TON ANALYSIS")
+print("AGRICULTURAL DATA LAKE - MULTI-QNZ ANALYSIS")
 print("=" * 60)
 
-print("\n--- Tonnage Summary (QNZ 22, Apr 2026) ---")
+print("\n--- Tonnage Summary (All QNZs) ---")
 tonnage_summary = conn.execute("""
     SELECT 
-        ferme,
+        qnz,
         SUM(tonnage) as total_tonnage,
-        COUNT(DISTINCT date) as harvest_days
+        COUNT(DISTINCT ferme) as ferme_count
     FROM tonnage
-    GROUP BY ferme
-    ORDER BY total_tonnage DESC
-    LIMIT 15
+    GROUP BY qnz
+    ORDER BY qnz
 """).df()
 print(tonnage_summary.to_string(index=False))
 
-print("\n--- Cost Summary by Domain (QNZ 19, 2019) ---")
+print("\n--- Cost Summary by QNZ ---")
 cost_summary = conn.execute("""
     SELECT 
-        domain_id,
-        Domaine,
-        SUM(Super) as total_superficie,
+        qnz,
         SUM("Montant Total") as total_cost,
-        SUM("Montant Total") / SUM(Super) as cost_per_ha
+        COUNT(DISTINCT Domaine) as domain_count
     FROM costs
-    GROUP BY domain_id, Domaine
-    ORDER BY total_cost DESC
-    LIMIT 15
+    GROUP BY qnz
+    ORDER BY qnz
 """).df()
 print(cost_summary.to_string(index=False))
 

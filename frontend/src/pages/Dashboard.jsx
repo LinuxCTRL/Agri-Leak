@@ -80,21 +80,29 @@ function Dashboard() {
       <h2>📊 Dashboard</h2>
 
       <div className="metrics">
-        <div className="metric">
+        <div className="metric" style={{ borderLeft: '4px solid var(--accent)' }}>
           <span className="label">Total Tonnage</span>
           <span className="value">{data?.summary?.total_tonnage?.toLocaleString() || 0} kg</span>
         </div>
-        <div className="metric">
-          <span className="label">Farms</span>
-          <span className="value">{farms.length || 0}</span>
+        <div className="metric" style={{ borderLeft: '4px solid var(--accent-warning)' }}>
+          <span className="label">Total Cost</span>
+          <span className="value">{formatNum(data?.summary?.total_cost)} MAD</span>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            {data?.summary?.cost_per_ton?.toFixed(2)} MAD/kg
+          </div>
         </div>
         <div className="metric">
-          <span className="label">Groups</span>
-          <span className="value">{data?.groups?.length || 0}</span>
+          <span className="label">Yield / Ha</span>
+          <span className="value">{data?.summary?.yield_per_ha?.toFixed(0)} kg</span>
+          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+            {data?.summary?.total_superficie?.toFixed(2)} ha total
+          </div>
         </div>
         <div className="metric">
-          <span className="label">Clubs</span>
-          <span className="value">{data?.clubs?.length || 0}</span>
+          <span className="label">Entities</span>
+          <span className="value" style={{ fontSize: '1.4rem' }}>
+            {farms.length} F · {data?.groups?.length} G · {data?.clubs?.length} C
+          </span>
         </div>
       </div>
 

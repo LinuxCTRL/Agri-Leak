@@ -1,5 +1,7 @@
 import pandas as pd
 from pathlib import Path
+import datetime
+import json
 
 DATA_DIR = Path("data")
 PROCESSED_DIR = Path("data/processed")
@@ -36,33 +38,57 @@ def calculate_qnz(date):
 
 
 def parse_qnz_number(filename):
-    """Extract QNZ number from filename like '... QNZ N° 21.xlsx'"""
+    """Extract QNZ number from filename like 'QNZ 19_FINAL_TONNAGE...'"""
     import re
-    match = re.search(r"QNZ\s*N°\s*(\d+)", filename, re.IGNORECASE)
+    match = re.search(r"QNZ\s*(\d+)", filename, re.IGNORECASE)
     return int(match.group(1)) if match else None
 
 
-def ingest_tonnage_file(file_path, qnz_num):
+def normalize_farm_name(name, mapping):
+    if not name or not isinstance(name, str):
+        return name
+    name = name.strip()
+    if name in mapping:
+        return mapping[name]
+    return name
+
+
+def ingest_tonnage_file(file_path, qnz_num, mapping):
     """Ingest tonnage data from a single Excel file."""
     xls = pd.ExcelFile(file_path)
-    sheet_name = f"SUIVI JOUR, TONNAGE QNZ N° {qnz_num}"
-    df = pd.read_excel(xls, sheet_name=sheet_name, header=3)
+    # Find the sheet that starts with "SUIVI JOUR"
+    sheet_name = next((s for s in xls.sheet_names if "SUIVI JOUR" in s), None)
+    
+    if not sheet_name:
+        print(f"Warning: Could not find SUIVI JOUR sheet in {file_path.name}")
+        return pd.DataFrame()
 
+    df = pd.read_excel(xls, sheet_name=sheet_name, header=3)
     df = df.dropna(subset=["GROUPE", "FERME"])
 
+    # Identify date columns (columns that are datetimes)
     date_cols = [c for c in df.columns if hasattr(c, 'year') and hasattr(c, 'month') and not isinstance(c, str)]
 
     records = []
     for _, row in df.iterrows():
-        group = row["GROUPE"]
-        club = row["CLUBS"]
-        code = row["CODE"]
-        ferme = row["FERME"]
-        variety = row["VARIETE"]
-        type_cult = row["TYPE"]
-        serre = row["SERRE N°"]
-        superficie = row["SUP"]
-        plant_date = row.get("DATE  PLT°.", None)
+        group = row.get("GROUPE")
+        club = row.get("CLUBS")
+        code = row.get("CODE")
+        ferme = normalize_farm_name(row.get("FERME"), mapping)
+        variety = row.get("VARIETE")
+        type_cult = row.get("TYPE")
+        serre = row.get("SERRE N°")
+        superficie = row.get("SUP")
+        plant_date_raw = row.get("DATE  PLT°.", None)
+        
+        # Ensure plant_date is datetime or None
+        plant_date = None
+        if pd.notna(plant_date_raw):
+            try:
+                plant_date = pd.to_datetime(plant_date_raw)
+            except:
+                plant_date = None
+
         global_tonnage = row.get("GLOBAL 1", 0)
 
         for date_col in date_cols:
@@ -94,10 +120,17 @@ def ingest_tonnage_file(file_path, qnz_num):
 
 def ingest_tonnage():
     """Ingest tonnage data from all QNZ Excel files."""
-    import re
+    # Load mapping
+    mapping_path = Path("backend/farm_mapping.json")
+    mapping = {}
+    if mapping_path.exists():
+        with open(mapping_path, "r") as f:
+            mapping = json.load(f)
+            # Ensure keys are stripped for matching
+            mapping = {k.strip(): v for k, v in mapping.items()}
 
     all_files = list(DATA_DIR.glob("*QNZ*.xlsx"))
-    all_files.sort(key=lambda f: parse_qnz_number(f.name))
+    all_files.sort(key=lambda f: parse_qnz_number(f.name) or 0)
 
     if not all_files:
         print("No QNZ Excel files found in data/")
@@ -107,10 +140,32 @@ def ingest_tonnage():
     for file_path in all_files:
         qnz_num = parse_qnz_number(file_path.name)
         print(f"Processing {file_path.name} (QNZ {qnz_num})...")
-        df = ingest_tonnage_file(file_path, qnz_num)
-        all_dfs.append(df)
+        df = ingest_tonnage_file(file_path, qnz_num, mapping)
+        if not df.empty:
+            all_dfs.append(df)
+
+    if not all_dfs:
+        return pd.DataFrame()
 
     df_tonnage = pd.concat(all_dfs, ignore_index=True)
+    
+    # --- Metadata Normalization ---
+    # Use latest available metadata (group, club, code) for each farm
+    # Sort by qnz descending to pick the most recent data first
+    metadata = df_tonnage.sort_values("qnz", ascending=False).groupby("ferme").agg({
+        "group": "first",
+        "club": "first",
+        "code": "first"
+    }).reset_index()
+    
+    # Merge the normalized metadata back into the main dataframe
+    df_tonnage = df_tonnage.drop(columns=["group", "club", "code"])
+    df_tonnage = pd.merge(df_tonnage, metadata, on="ferme", how="left")
+    # ------------------------------
+    
+    # Ensure processed directory exists
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    
     output_path = PROCESSED_DIR / "tonnage_combined.parquet"
     df_tonnage.to_parquet(output_path, engine="pyarrow", index=False)
     print(f"Saved combined tonnage data: {len(df_tonnage)} rows -> {output_path}")
@@ -118,26 +173,60 @@ def ingest_tonnage():
 
 
 def ingest_costs():
-    """Ingest cost data from all 22 domain sheets."""
+    """Ingest cost data from all sheets in the cost file."""
+    # Load mapping
+    mapping_path = Path("backend/farm_mapping.json")
+    mapping = {}
+    if mapping_path.exists():
+        with open(mapping_path, "r") as f:
+            mapping = json.load(f)
+            mapping = {k.strip(): v for k, v in mapping.items()}
+
     file_path = DATA_DIR / "1-QUINZAINE 25-26-19.xlsx"
+    if not file_path.exists():
+        print(f"Cost file {file_path} not found.")
+        return pd.DataFrame()
+
     xls = pd.ExcelFile(file_path)
 
     all_costs = []
     for sheet in xls.sheet_names:
+        # Only process sheets with numeric names (representing quinzaines or domains)
+        if not sheet.isdigit():
+            continue
+            
         df = pd.read_excel(xls, sheet_name=sheet, header=0)
         df = df.dropna(subset=["Domaine"])
 
-        df["domain_id"] = int(sheet)
-        df["qnz"] = 19
+        if df.empty:
+            continue
+
+        df["sheet_name"] = sheet
+        qnz_val = int(sheet)
+        df["qnz"] = qnz_val
+        df["domain_id"] = qnz_val
+        
+        # Agricultural year 25-26
         df["year_start"] = 2025
         df["year_end"] = 2026
         df["quinzaine_type"] = 1
+        
+        # Normalize farm names
+        df["Domaine"] = df["Domaine"].apply(lambda x: normalize_farm_name(x, mapping))
 
         all_costs.append(df)
 
+    if not all_costs:
+        return pd.DataFrame()
+
     df_costs = pd.concat(all_costs, ignore_index=True)
 
-    output_path = PROCESSED_DIR / "costs_qnz19_d1_22.parquet"
+    # Convert object columns to string to avoid parquet mixed-type errors
+    for col in df_costs.columns:
+        if df_costs[col].dtype == 'object':
+            df_costs[col] = df_costs[col].fillna("").astype(str)
+
+    output_path = PROCESSED_DIR / "costs_combined.parquet"
     df_costs.to_parquet(output_path, engine="pyarrow", index=False)
     print(f"Saved cost data: {len(df_costs)} rows -> {output_path}")
     return df_costs

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 import duckdb
 import pandas as pd
+import numpy as np
 from pathlib import Path
 from typing import Optional
 import os
@@ -30,28 +31,48 @@ app.add_middleware(
 CONFIG_PATH = Path(__file__).parent / "farm_mapping.json"
 if CONFIG_PATH.exists():
     with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        FARM_NAME_MAP = json.load(f)
+        # Normalize mapping keys: strip spaces to prevent mismatch
+        _raw_map = json.load(f)
+        FARM_NAME_MAP = {k.strip(): v for k, v in _raw_map.items()}
 else:
     FARM_NAME_MAP = {}
 
 
 def normalize_farm_name(name):
     """Normalize a farm name using the mapping table."""
+    if not name or not isinstance(name, str):
+        return name
+    name = name.strip()
     if name in FARM_NAME_MAP:
         return FARM_NAME_MAP[name]
-    return name.strip()
+    return name
 
 
 import math
 
-def _sanitize_records(df):
-    """Convert a DataFrame to list of dicts, replacing NaN/inf with None for JSON safety."""
-    records = df.to_dict(orient="records")
+def _sanitize_records(data):
+    """Sanitize data by replacing NaN/inf with None for JSON safety."""
+    if isinstance(data, pd.DataFrame):
+        records = data.to_dict(orient="records")
+    elif isinstance(data, list):
+        records = data
+    elif isinstance(data, dict):
+        records = [data] # Wrap in list to use the same logic
+    else:
+        return data
+
     for row in records:
-        for k, v in row.items():
-            if isinstance(v, float) and (math.isnan(v) or math.isinf(v)):
-                row[k] = None
-    return records
+        if isinstance(row, dict):
+            for k, v in row.items():
+                # Avoid ValueError: truth value of array is ambiguous
+                if isinstance(v, (list, np.ndarray, tuple)):
+                    continue
+                if pd.isna(v):
+                    row[k] = None
+                elif isinstance(v, (float, np.float64, np.float32)) and math.isinf(v):
+                    row[k] = None
+    
+    return records if not isinstance(data, dict) else records[0]
 
 
 def get_tonnage_df():
@@ -59,7 +80,7 @@ def get_tonnage_df():
 
 
 def get_costs_df():
-    df = pd.read_parquet(PROCESSED_DIR / "costs_qnz19_d1_22.parquet")
+    df = pd.read_parquet(PROCESSED_DIR / "costs_combined.parquet")
     df["Domaine"] = df["Domaine"].apply(normalize_farm_name)
     return df
 
@@ -96,9 +117,17 @@ def get_tonnage(
     if club:
         df = df[df["club"] == club]
     if ferme:
-        df = df[df["ferme"] == ferme]
+        df = df[df["ferme"] == normalize_farm_name(ferme)]
 
-    return df.to_dict(orient="records")
+    return _sanitize_records(df)
+
+
+@app.get("/api/available-qnz")
+def get_available_qnz():
+    """Returns a unique sorted list of all available quinzaines from the data lake."""
+    df = get_tonnage_df()
+    qnz_list = sorted(df["qnz"].unique().tolist())
+    return qnz_list
 
 
 @app.get("/api/tonnage/summary")
@@ -110,6 +139,9 @@ def get_tonnage_summary(
     qnz: Optional[int] = None,
 ):
     df = get_tonnage_df()
+
+    if qnz is None and not start_date and not end_date:
+        qnz = int(df["qnz"].max())
 
     if start_date:
         df = df[df["date"] >= start_date]
@@ -124,51 +156,72 @@ def get_tonnage_summary(
 
     total_tonnage = df["tonnage"].sum()
 
+    # Get cost data for the same filter
+    costs_df = get_costs_df()
+    if qnz:
+        qnz_costs = costs_df[costs_df["qnz"] == qnz]
+        total_cost = qnz_costs["Montant Total"].sum()
+    elif start_date or end_date:
+        # Note: cost data doesn't have daily dates, only QNZ. 
+        # This is an approximation or we skip cost for date ranges.
+        total_cost = 0
+    else:
+        total_cost = costs_df["Montant Total"].sum()
+
     by_farm = df.groupby("ferme").agg(
         tonnage=("tonnage", "sum"),
         superficie=("superficie", lambda x: x.drop_duplicates().sum()),
         days=("date", "nunique")
-    ).reset_index().sort_values("tonnage", ascending=False).to_dict(orient="records")
+    ).reset_index().sort_values("tonnage", ascending=False)
+    
+    total_superficie = by_farm["superficie"].sum()
 
     by_group = df.groupby("group").agg(
         tonnage=("tonnage", "sum"),
         farms=("ferme", "nunique")
-    ).reset_index().sort_values("tonnage", ascending=False).to_dict(orient="records")
+    ).reset_index().sort_values("tonnage", ascending=False)
 
     by_club = df.groupby("club").agg(
         tonnage=("tonnage", "sum"),
         farms=("ferme", "nunique")
-    ).reset_index().sort_values("tonnage", ascending=False).to_dict(orient="records")
+    ).reset_index().sort_values("tonnage", ascending=False)
 
     return {
         "total_tonnage": float(total_tonnage) if pd.notna(total_tonnage) else 0,
-        "by_farm": by_farm,
-        "by_group": by_group,
-        "by_club": by_club,
+        "total_cost": float(total_cost) if pd.notna(total_cost) else 0,
+        "total_superficie": float(total_superficie) if pd.notna(total_superficie) else 0,
+        "cost_per_ton": float(total_cost / total_tonnage) if total_tonnage > 0 else 0,
+        "yield_per_ha": float(total_tonnage / total_superficie) if total_superficie > 0 else 0,
+        "by_farm": _sanitize_records(by_farm),
+        "by_group": _sanitize_records(by_group),
+        "by_club": _sanitize_records(by_club),
     }
 
 
 @app.get("/api/tonnage/groups")
 def get_groups(qnz: Optional[int] = None):
     df = get_tonnage_df()
-    if qnz:
-        df = df[df["qnz"] == qnz]
+    if qnz is None:
+        qnz = int(df["qnz"].max())
+    df = df[df["qnz"] == qnz]
     return sorted(df["group"].unique().tolist())
 
 
 @app.get("/api/tonnage/clubs")
 def get_clubs(qnz: Optional[int] = None):
     df = get_tonnage_df()
-    if qnz:
-        df = df[df["qnz"] == qnz]
+    if qnz is None:
+        qnz = int(df["qnz"].max())
+    df = df[df["qnz"] == qnz]
     return sorted(df["club"].unique().tolist())
 
 
 @app.get("/api/tonnage/farms")
 def get_farms(qnz: Optional[int] = None):
     df = get_tonnage_df()
-    if qnz:
-        df = df[df["qnz"] == qnz]
+    if qnz is None:
+        qnz = int(df["qnz"].max())
+    df = df[df["qnz"] == qnz]
     by_farm = df.groupby("ferme").agg(
         tonnage=("tonnage", "sum"),
         superficie=("superficie", lambda x: x.drop_duplicates().sum()),
@@ -177,8 +230,8 @@ def get_farms(qnz: Optional[int] = None):
         group_name=("group", "first"),
         club=("club", "first"),
         code=("code", "first")
-    ).reset_index().sort_values("tonnage", ascending=False).to_dict(orient="records")
-    return by_farm
+    ).reset_index().sort_values("tonnage", ascending=False)
+    return _sanitize_records(by_farm)
 
 
 @app.get("/api/tonnage/qnz")
@@ -206,21 +259,23 @@ def get_costs_qnz_list():
 def get_costs(domain: Optional[str] = None):
     df = get_costs_df()
     if domain:
-        df = df[df["Domaine"] == domain]
-    return df.to_dict(orient="records")
+        df = df[df["Domaine"] == normalize_farm_name(domain)]
+    return _sanitize_records(df)
 
 
 @app.get("/api/costs/summary")
-def get_costs_summary():
+def get_costs_summary(qnz: Optional[int] = None):
     df = get_costs_df()
-    df = df[df["domain_id"] == 22]
+    if qnz is None:
+        qnz = int(df["qnz"].max())
+    df = df[df["qnz"] == qnz]
     df = df.groupby("Domaine").agg(
         Super=("Super", "first"),
         Montant_Total=("Montant Total", "sum"),
-        domain_id=("domain_id", "first"),
+        qnz=("qnz", "first"),
         cost_per_ha=("Cout Ouvriers/ha", "first")
     ).reset_index()
-    return df.sort_values("Montant_Total", ascending=False).to_dict(orient="records")
+    return _sanitize_records(df.sort_values("Montant_Total", ascending=False))
 
 
 @app.get("/api/cost-per-ton")
@@ -228,11 +283,11 @@ def get_cost_per_ton(qnz: Optional[int] = None):
     tonnage_df = get_tonnage_df()
     costs_df = get_costs_df()
     
-    if qnz:
-        tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
-        costs_df = costs_df[costs_df["qnz"] == qnz]
-    else:
-        costs_df = costs_df[costs_df["domain_id"] == 22]
+    if qnz is None:
+        qnz = int(tonnage_df["qnz"].max())
+        
+    tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
+    costs_df = costs_df[costs_df["qnz"] == qnz]
 
     tonnage_by_ferme = tonnage_df.groupby("ferme")["tonnage"].sum().reset_index()
     tonnage_by_ferme.columns = ["Domaine", "total_tonnage"]
@@ -256,8 +311,8 @@ def get_cost_per_ton(qnz: Optional[int] = None):
     merged_variety = merged_variety.sort_values("cost_per_ton")
 
     return {
-        "by_farm": merged.to_dict(orient="records"),
-        "by_variety": merged_variety.to_dict(orient="records")
+        "by_farm": _sanitize_records(merged),
+        "by_variety": _sanitize_records(merged_variety)
     }
 
 
@@ -269,7 +324,7 @@ def get_cost_trend(farm: Optional[str] = None):
     costs_df = get_costs_df()
 
     if farm:
-        costs_df = costs_df[costs_df["Domaine"] == farm]
+        costs_df = costs_df[costs_df["Domaine"] == normalize_farm_name(farm)]
 
     trend = costs_df.groupby("domain_id").agg(
         total_cost=("Montant Total", "sum"),
@@ -296,11 +351,11 @@ def get_productivity(qnz: Optional[int] = None):
     tonnage_df = get_tonnage_df()
     costs_df = get_costs_df()
     
-    if qnz:
-        tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
-        costs_df = costs_df[costs_df["qnz"] == qnz]
-    else:
-        costs_df = costs_df[costs_df["domain_id"] == 22]
+    if qnz is None:
+        qnz = int(tonnage_df["qnz"].max())
+        
+    tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
+    costs_df = costs_df[costs_df["qnz"] == qnz]
 
     # By farm
     by_farm = tonnage_df.groupby("ferme").agg(
@@ -362,8 +417,10 @@ def get_varieties(qnz: Optional[int] = None):
     """List of all varieties with their type and the domains planting them."""
     tonnage_df = get_tonnage_df()
     
-    if qnz:
-        tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
+    if qnz is None:
+        qnz = int(tonnage_df["qnz"].max())
+        
+    tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
     
     by_variety = tonnage_df.groupby(["variety", "type"]).agg(
         tonnage=("tonnage", "sum"),
@@ -386,11 +443,11 @@ def get_crop_types(qnz: Optional[int] = None):
     tonnage_df = get_tonnage_df()
     costs_df = get_costs_df()
     
-    if qnz:
-        tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
-        costs_df = costs_df[costs_df["qnz"] == qnz]
-    else:
-        costs_df = costs_df[costs_df["domain_id"] == 22]
+    if qnz is None:
+        qnz = int(tonnage_df["qnz"].max())
+        
+    tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
+    costs_df = costs_df[costs_df["qnz"] == qnz]
 
     # Tonnage by type
     by_type = tonnage_df.groupby("type").agg(
@@ -432,12 +489,12 @@ def get_crop_types(qnz: Optional[int] = None):
 # ── NEW: Cost Breakdown Endpoint ────────────────────────────────────
 
 @app.get("/api/cost-breakdown")
-def get_cost_breakdown(qnz_id: Optional[int] = None):
+def get_cost_breakdown(qnz: Optional[int] = None):
     """Cost category breakdown across all farms for a specific quinzaine or all."""
     costs_df = get_costs_df()
 
-    if qnz_id is not None:
-        costs_df = costs_df[costs_df["domain_id"] == qnz_id]
+    if qnz is not None:
+        costs_df = costs_df[costs_df["qnz"] == qnz]
 
     # Aggregated categories
     categories = {
@@ -470,7 +527,7 @@ def get_cost_breakdown(qnz_id: Optional[int] = None):
     return {
         "summary": summary,
         "total": float(total),
-        "by_farm": by_farm.to_dict(orient="records"),
+        "by_farm": _sanitize_records(by_farm),
     }
 
 
@@ -479,11 +536,11 @@ def get_cost_breakdown(qnz_id: Optional[int] = None):
 @app.get("/api/group/{group_name}")
 def get_group_details(group_name: str, qnz: Optional[int] = None):
     df = get_tonnage_df()
-    group_df = df[df["group"] == group_name]
-    
-    if qnz:
-        group_df = group_df[group_df["qnz"] == qnz]
 
+    if qnz is None:
+        qnz = int(df["qnz"].max())
+
+    group_df = df[(df["group"] == group_name) & (df["qnz"] == qnz)]
     summary = {
         "total_tonnage": float(group_df["tonnage"].sum()),
         "farms": group_df["ferme"].nunique(),
@@ -498,23 +555,23 @@ def get_group_details(group_name: str, qnz: Optional[int] = None):
         harvest_days=("date", "nunique"),
         club=("club", "first"),
         code=("code", "first")
-    ).reset_index().sort_values("tonnage", ascending=False).to_dict(orient="records")
+    ).reset_index().sort_values("tonnage", ascending=False)
 
     return {
         "group": group_name,
         "summary": summary,
-        "farms": by_farm,
+        "farms": _sanitize_records(by_farm),
     }
 
 
 @app.get("/api/club/{club_name}")
 def get_club_details(club_name: str, qnz: Optional[int] = None):
     df = get_tonnage_df()
-    club_df = df[df["club"] == club_name]
-    
-    if qnz:
-        club_df = club_df[club_df["qnz"] == qnz]
 
+    if qnz is None:
+        qnz = int(df["qnz"].max())
+
+    club_df = df[(df["club"] == club_name) & (df["qnz"] == qnz)]
     summary = {
         "total_tonnage": float(club_df["tonnage"].sum()),
         "farms": club_df["ferme"].nunique(),
@@ -527,15 +584,16 @@ def get_club_details(club_name: str, qnz: Optional[int] = None):
         superficie=("superficie", lambda x: x.drop_duplicates().sum()),
         varieties=("variety", "nunique"),
         harvest_days=("date", "nunique"),
-        group_name=("group", "first"),
+        group=("group", "first"),
         code=("code", "first")
-    ).reset_index().sort_values("tonnage", ascending=False).to_dict(orient="records")
+    ).reset_index().sort_values("tonnage", ascending=False)
 
     return {
         "club": club_name,
         "summary": summary,
-        "farms": by_farm,
+        "farms": _sanitize_records(by_farm),
     }
+
 
 
 @app.get("/api/domain/{ferme_name}")
@@ -543,20 +601,21 @@ def get_domain_details(ferme_name: str, qnz: Optional[int] = None):
     tonnage_df = get_tonnage_df()
     costs_df = get_costs_df()
 
-    domain_df = tonnage_df[tonnage_df["ferme"] == ferme_name]
-    cost_df = costs_df[costs_df["Domaine"] == ferme_name]
+    # Normalize input name to match source-normalized data
+    canonical_name = normalize_farm_name(ferme_name)
 
-    if qnz:
-        domain_df = domain_df[domain_df["qnz"] == qnz]
-        cost_df = cost_df[cost_df["qnz"] == qnz]
-    else:
-        cost_df = cost_df[cost_df["domain_id"] == 22]
+    # Default to latest QNZ if none provided
+    if qnz is None:
+        qnz = int(tonnage_df["qnz"].max())
+
+    domain_df = tonnage_df[(tonnage_df["ferme"] == canonical_name) & (tonnage_df["qnz"] == qnz)]
+    cost_df = costs_df[(costs_df["Domaine"] == canonical_name) & (costs_df["qnz"] == qnz)]
 
     if len(domain_df) == 0:
-        return {"error": "Domain not found"}, 404
+        return JSONResponse(status_code=404, content={"error": f"No data found for {ferme_name} in QNZ {qnz}"})
 
     details = {
-        "ferme": ferme_name,
+        "ferme": canonical_name,
         "code": domain_df["code"].iloc[0],
         "group": domain_df["group"].iloc[0],
         "club": domain_df["club"].iloc[0],
@@ -581,45 +640,71 @@ def get_domain_details(ferme_name: str, qnz: Optional[int] = None):
         plant_date=("plant_date", "first"),
     ).reset_index()
     by_variety["yield_per_ha"] = by_variety["tonnage"] / by_variety["superficie"]
-    by_variety = by_variety.sort_values("tonnage", ascending=False).to_dict(orient="records")
 
     by_serre = domain_df.groupby(["serre", "variety", "type"]).agg(
         tonnage=("tonnage", "sum"),
         superficie=("superficie", "first"),
-    ).reset_index().sort_values("tonnage", ascending=False).to_dict(orient="records")
+    ).reset_index().sort_values("tonnage", ascending=False)
 
     daily_harvest = domain_df.groupby("date").agg(
         tonnage=("tonnage", "sum")
-    ).reset_index().sort_values("date").to_dict(orient="records")
+    ).reset_index().sort_values("date")
 
     cost_info = None
     if len(cost_df) > 0:
-        cost_22 = cost_df[cost_df["domain_id"] == 22]
-        total_cost = float(cost_22["Montant Total"].sum()) if len(cost_22) > 0 else float(cost_df["Montant Total"].sum())
-        sup = float(cost_22["Super"].iloc[0]) if len(cost_22) > 0 else float(cost_df["Super"].iloc[0])
+        total_cost = float(cost_df["Montant Total"].sum())
+        sup = float(cost_df["Super"].iloc[0])
 
-        cost_per_ha_val = float(cost_22["Cout Ouvriers/ha"].mean()) if len(cost_22) > 0 and "Cout Ouvriers/ha" in cost_22.columns else 0
+        cost_per_ha_val = float(cost_df["Cout Ouvriers/ha"].mean()) if "Cout Ouvriers/ha" in cost_df.columns else 0
 
         cost_info = {
             "total_cost": total_cost,
             "superficie": sup,
             "cost_per_ton": total_cost / total_tonnage if total_tonnage > 0 else 0,
             "cost_per_ha": cost_per_ha_val,
-            "main_doeuvre": float(cost_22["Main D'oeuvrs"].sum()) if len(cost_22) > 0 and "Main D'oeuvrs" in cost_22.columns else 0,
-            "echassier": float(cost_22["ECHASSIER"].fillna(0).sum()) if len(cost_22) > 0 and "ECHASSIER" in cost_22.columns else 0,
-            "poste_fixe": float(cost_22["Poste Fixe"].fillna(0).sum()) if len(cost_22) > 0 and "Poste Fixe" in cost_22.columns else 0,
-            "depenses_externe": float(cost_22["Dépences externe"].fillna(0).sum()) if len(cost_22) > 0 and "Dépences externe" in cost_22.columns else 0,
-            "depenses_interne": float(cost_22["Autre Dépences interne"].fillna(0).sum()) if len(cost_22) > 0 and "Autre Dépences interne" in cost_22.columns else 0,
+            "main_doeuvre": float(cost_df["Main D'oeuvrs"].sum()) if "Main D'oeuvrs" in cost_df.columns else 0,
+            "echassier": float(cost_df["ECHASSIER"].fillna(0).sum()) if "ECHASSIER" in cost_df.columns else 0,
+            "poste_fixe": float(cost_df["Poste Fixe"].fillna(0).sum()) if "Poste Fixe" in cost_df.columns else 0,
+            "depenses_externe": float(cost_df["Dépences externe"].fillna(0).sum()) if "Dépences externe" in cost_df.columns else 0,
+            "depenses_interne": float(cost_df["Autre Dépences interne"].fillna(0).sum()) if "Autre Dépences interne" in cost_df.columns else 0,
         }
 
     return {
-        "details": details,
+        "details": _sanitize_records(details),
         "summary": summary,
-        "by_variety": by_variety,
-        "by_serre": by_serre,
-        "daily_harvest": daily_harvest,
+        "by_variety": _sanitize_records(by_variety),
+        "by_serre": _sanitize_records(by_serre),
+        "daily_harvest": _sanitize_records(daily_harvest),
         "cost": cost_info,
     }
+
+
+
+@app.get("/api/comparison/qnz")
+def get_qnz_comparison():
+    """Returns total tonnage and total cost summarized by quinzaine."""
+    tonnage_df = get_tonnage_df()
+    costs_df = get_costs_df()
+
+    # Aggregate tonnage by QNZ
+    tonnage_agg = tonnage_df.groupby("qnz").agg(
+        total_tonnage=("tonnage", "sum"),
+        farms_count=("ferme", "nunique")
+    ).reset_index()
+
+    # Aggregate costs by QNZ
+    costs_agg = costs_df.groupby("qnz").agg(
+        total_cost=("Montant Total", "sum"),
+        domains_count=("Domaine", "nunique")
+    ).reset_index()
+
+    # Merge them
+    comparison = pd.merge(tonnage_agg, costs_agg, on="qnz", how="outer").sort_values("qnz")
+    
+    # Calculate cost per ton
+    comparison["cost_per_ton"] = comparison["total_cost"] / comparison["total_tonnage"]
+    
+    return _sanitize_records(comparison)
 
 
 # ── AI Chat Endpoint ──────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useQnz } from '../context/QnzContext'
+import { useTheme } from '../theme/ThemeContext'
 
 // ─── Icons (inline SVG for zero-dependency) ───────────────────────────────
 function IconDashboard() {
@@ -147,30 +148,8 @@ function Sidebar({ onWidthChange }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
 
-  // Theme state — initialized from localStorage with try/catch for private browsing
-  const [theme, setTheme] = useState(() => {
-    try {
-      return localStorage.getItem('theme') || 'dark'
-    } catch {
-      return 'dark'
-    }
-  })
-
   const { selectedQnz, setSelectedQnz, availableQnz } = useQnz()
-
-  // Apply theme to document.body and persist
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.body.classList.add('dark')
-    } else {
-      document.body.classList.remove('dark')
-    }
-    try {
-      localStorage.setItem('theme', theme)
-    } catch {
-      // private browsing — ignore
-    }
-  }, [theme])
+  const { themeId, theme, setThemeId, availableThemes } = useTheme()
 
   // Mobile detection via matchMedia
   useEffect(() => {
@@ -213,9 +192,11 @@ function Sidebar({ onWidthChange }) {
     }
   }, [isMobile])
 
-  const toggleTheme = useCallback(() => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'))
-  }, [])
+  const cycleTheme = useCallback(() => {
+    const currentIdx = availableThemes.findIndex(t => t.id === themeId)
+    const nextIdx = (currentIdx + 1) % availableThemes.length
+    setThemeId(availableThemes[nextIdx].id)
+  }, [themeId, availableThemes, setThemeId])
 
   const sidebarWidth = collapsed ? 64 : 240
 
@@ -227,6 +208,7 @@ function Sidebar({ onWidthChange }) {
     { to: '/segments',       icon: <IconSegments />,      label: 'Segments' },
     { to: '/cost-per-ton',   icon: <IconCostTon />,       label: 'Cost/Ton' },
     { to: '/cost-breakdown', icon: <IconCostBreakdown />, label: 'Cost Breakdown' },
+    { to: '/comparison',     icon: <IconProductivity />,  label: 'QNZ Comparison' },
   ]
 
   // On mobile, sidebar is an overlay triggered by mobileOpen
@@ -337,23 +319,37 @@ function Sidebar({ onWidthChange }) {
           </div>
         )}
 
-        {/* ── Footer: theme toggle ── */}
+        {/* ── Footer: theme selector ── */}
         <div className="sidebar-footer">
-          <button
-            className="sidebar-theme-toggle"
-            onClick={toggleTheme}
-            title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-            aria-label={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
-          >
-            <span className="sidebar-theme-icon">
-              {theme === 'light' ? <IconMoon /> : <IconSun />}
-            </span>
-            {(!collapsed || isMobile) && (
-              <span className="sidebar-theme-label">
-                {theme === 'light' ? 'Dark Mode' : 'Light Mode'}
-              </span>
-            )}
-          </button>
+          {(!collapsed || isMobile) ? (
+            <div className="sidebar-theme-picker">
+              <span className="sidebar-theme-label">Theme</span>
+              <div className="sidebar-theme-options">
+                {availableThemes.map((t) => (
+                  <button
+                    key={t.id}
+                    className={`sidebar-theme-option${t.id === themeId ? ' sidebar-theme-option--active' : ''}`}
+                    onClick={() => setThemeId(t.id)}
+                    title={t.description}
+                    aria-label={t.name}
+                    aria-pressed={t.id === themeId}
+                  >
+                    <span className="sidebar-theme-option-icon">{t.icon}</span>
+                    <span className="sidebar-theme-option-name">{t.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <button
+              className="sidebar-theme-toggle"
+              onClick={cycleTheme}
+              title={`Current: ${theme.name} — Click to cycle`}
+              aria-label={`Current theme: ${theme.name}. Click to change`}
+            >
+              <span className="sidebar-theme-icon">{theme.icon}</span>
+            </button>
+          )}
         </div>
       </aside>
     </>

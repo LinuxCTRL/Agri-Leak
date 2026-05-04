@@ -115,19 +115,19 @@ function CostPerTon() {
           <div className="chart" style={{ borderLeft: '4px solid var(--accent)' }}>
             <h3 style={{ color: 'var(--accent)' }}>🏆 Most Efficient Farm</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'Outfit, sans-serif' }}>{bestFarm.Domaine}</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>{bestFarm.Domaine}</div>
               <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Cost/Ton</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent)', fontFamily: 'Outfit' }}>{bestFarm.cost_per_ton.toFixed(2)} MAD</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent)', fontFamily: 'var(--font-heading)' }}>{bestFarm.cost_per_ton.toFixed(2)} MAD</div>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Tonnage</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Outfit' }}>{formatNum(bestFarm.total_tonnage)} kg</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{formatNum(bestFarm.total_tonnage)} kg</div>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Total Cost</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Outfit' }}>{formatNum(bestFarm.total_cost)} MAD</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{formatNum(bestFarm.total_cost)} MAD</div>
                 </div>
               </div>
             </div>
@@ -135,19 +135,19 @@ function CostPerTon() {
           <div className="chart" style={{ borderLeft: '4px solid var(--accent-warning)' }}>
             <h3 style={{ color: 'var(--accent-warning)' }}>⚠️ Least Efficient Farm</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'Outfit, sans-serif' }}>{worstFarm.Domaine}</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>{worstFarm.Domaine}</div>
               <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Cost/Ton</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent-warning)', fontFamily: 'Outfit' }}>{worstFarm.cost_per_ton.toFixed(2)} MAD</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent-warning)', fontFamily: 'var(--font-heading)' }}>{worstFarm.cost_per_ton.toFixed(2)} MAD</div>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Tonnage</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Outfit' }}>{formatNum(worstFarm.total_tonnage)} kg</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{formatNum(worstFarm.total_tonnage)} kg</div>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Total Cost</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Outfit' }}>{formatNum(worstFarm.total_cost)} MAD</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{formatNum(worstFarm.total_cost)} MAD</div>
                 </div>
               </div>
             </div>

@@ -16,8 +16,8 @@ def load_data():
     conn = duckdb.connect(str(OUTPUT_DIR / "analytics.duckdb"))
     conn.execute("DROP TABLE IF EXISTS tonnage")
     conn.execute("DROP TABLE IF EXISTS costs")
-    conn.execute("CREATE TABLE tonnage AS SELECT * FROM 'data/processed/tonnage_qnz22.parquet'")
-    conn.execute("CREATE TABLE costs AS SELECT * FROM 'data/processed/costs_qnz19_d1_22.parquet'")
+    conn.execute("CREATE TABLE tonnage AS SELECT * FROM 'data/processed/tonnage_combined.parquet'")
+    conn.execute("CREATE TABLE costs AS SELECT * FROM 'data/processed/costs_combined.parquet'")
 
     tonnage = conn.execute("SELECT * FROM tonnage").df()
     costs = conn.execute("SELECT * FROM costs").df()
@@ -26,7 +26,9 @@ def load_data():
 
 
 def calculate_cost_per_ton(tonnage_df, costs_df):
-    costs_df = costs_df[costs_df["domain_id"] == 22]
+    latest_qnz = tonnage_df["qnz"].max()
+    costs_df = costs_df[costs_df["qnz"] == latest_qnz]
+    tonnage_df = tonnage_df[tonnage_df["qnz"] == latest_qnz]
     tonnage_agg = tonnage_df.groupby("ferme")["tonnage"].sum().reset_index()
     tonnage_agg.columns = ["Domaine", "total_tonnage"]
 
@@ -206,7 +208,8 @@ elif page == "💰 Costs":
         st.bar_chart(cost_breakdown.set_index("Category")["Amount"])
 
     st.subheader("All Domains Cost Summary")
-    costs_filtered = costs[costs["domain_id"] == 22]
+    latest_qnz = tonnage["qnz"].max()
+    costs_filtered = costs[costs["qnz"] == latest_qnz]
     cost_summary = costs_filtered.groupby("Domaine").agg({
         "Super": "first",
         "Montant Total": "sum",

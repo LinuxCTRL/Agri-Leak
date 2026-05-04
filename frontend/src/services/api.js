@@ -23,5 +23,6 @@ export const getDomainDetails = (ferme, params) => api.get(`/api/domain/${ferme}
 export const getCostTrend = (farm) => api.get('/api/cost-trend', { params: farm ? { farm } : {} })
 export const getProductivity = (params) => api.get('/api/productivity', { params })
 export const getVarieties = (params) => api.get('/api/varieties', { params })
-export const getCostBreakdown = (qnzId) => api.get('/api/cost-breakdown', { params: { qnz_id: qnzId } })
+export const getCostBreakdown = (qnz) => api.get('/api/cost-breakdown', { params: { qnz } })
+export const getQnzComparison = () => api.get('/api/comparison/qnz')
 export const askAI = (question) => api.post('/api/ai/chat', { question })

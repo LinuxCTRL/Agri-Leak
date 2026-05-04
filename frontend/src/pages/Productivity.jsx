@@ -86,19 +86,19 @@ function Productivity() {
           <div className="chart" style={{ borderLeft: '4px solid var(--accent)' }}>
             <h3 style={{ color: 'var(--accent)' }}>🏆 Highest Yield Farm</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'Outfit, sans-serif' }}>{bestYieldFarm.ferme}</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>{bestYieldFarm.ferme}</div>
               <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Yield/Ha</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent)', fontFamily: 'Outfit' }}>{formatNum(bestYieldFarm.yield_per_ha)} kg</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent)', fontFamily: 'var(--font-heading)' }}>{formatNum(bestYieldFarm.yield_per_ha)} kg</div>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Total Tonnage</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Outfit' }}>{formatNum(bestYieldFarm.tonnage)} kg</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{formatNum(bestYieldFarm.tonnage)} kg</div>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Superficie</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Outfit' }}>{bestYieldFarm.superficie?.toFixed(1)} ha</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{bestYieldFarm.superficie?.toFixed(1)} ha</div>
                 </div>
               </div>
             </div>
@@ -106,19 +106,19 @@ function Productivity() {
           <div className="chart" style={{ borderLeft: '4px solid var(--accent-warning)' }}>
             <h3 style={{ color: 'var(--accent-warning)' }}>⚠️ Lowest Yield Farm</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'Outfit, sans-serif' }}>{worstYieldFarm.ferme}</div>
+              <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>{worstYieldFarm.ferme}</div>
               <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Yield/Ha</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent-warning)', fontFamily: 'Outfit' }}>{formatNum(worstYieldFarm.yield_per_ha)} kg</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent-warning)', fontFamily: 'var(--font-heading)' }}>{formatNum(worstYieldFarm.yield_per_ha)} kg</div>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Total Tonnage</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Outfit' }}>{formatNum(worstYieldFarm.tonnage)} kg</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{formatNum(worstYieldFarm.tonnage)} kg</div>
                 </div>
                 <div>
                   <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Superficie</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'Outfit' }}>{worstYieldFarm.superficie?.toFixed(1)} ha</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{worstYieldFarm.superficie?.toFixed(1)} ha</div>
                 </div>
               </div>
             </div>

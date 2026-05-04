@@ -9,10 +9,14 @@ export function QnzProvider({ children }) {
 
   useEffect(() => {
     const saved = localStorage.getItem('selectedQnz')
-    api.get('/api/tonnage').then(res => {
-      const qnzList = [...new Set(res.data.map(r => r.qnz))].sort()
+    api.get('/api/available-qnz').then(res => {
+      const qnzList = res.data
       setAvailableQnz(qnzList)
-      const defaultQnz = saved ? Number(saved) : (qnzList.length > 0 ? qnzList[0] : null)
+      
+      // Default to the latest (highest) QNZ if none saved
+      const latestQnz = qnzList.length > 0 ? Math.max(...qnzList) : 22
+      const defaultQnz = saved ? Number(saved) : latestQnz
+      
       setSelectedQnz(defaultQnz)
       localStorage.setItem('selectedQnz', defaultQnz)
     }).catch(() => {
