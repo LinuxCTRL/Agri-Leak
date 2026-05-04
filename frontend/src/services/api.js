@@ -25,4 +25,5 @@ export const getProductivity = (params) => api.get('/api/productivity', { params
 export const getVarieties = (params) => api.get('/api/varieties', { params })
 export const getCostBreakdown = (qnz) => api.get('/api/cost-breakdown', { params: { qnz } })
 export const getQnzComparison = () => api.get('/api/comparison/qnz')
+export const getAvailableQnz = () => api.get('/api/available-qnz')
 export const askAI = (question) => api.post('/api/ai/chat', { question })

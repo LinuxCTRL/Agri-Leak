@@ -1587,3 +1587,595 @@ button, input, select, textarea {
 .chart-fullscreen-close:hover {
   background: rgba(255, 255, 255, 0.2);
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   COMPARISON PAGE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.comparison-page {
+  max-width: 1400px;
+}
+
+/* ── Header ── */
+.comparison-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.comparison-header h2 {
+  margin-bottom: 6px;
+}
+
+.comparison-subtitle {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* ── Mode Toggle ── */
+.comparison-mode-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 5px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  margin-bottom: 20px;
+}
+
+.comparison-mode-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 200ms ease;
+  white-space: nowrap;
+}
+
+.comparison-mode-btn:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+
+.comparison-mode-btn--active {
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.3);
+  font-weight: 600;
+}
+
+.comparison-mode-btn--active:hover {
+  background: var(--accent-hover);
+  color: #fff;
+}
+
+.comparison-mode-icon {
+  font-size: 1rem;
+}
+
+.comparison-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.comparison-mode-btn--active .comparison-mode-badge {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Multi-Select ── */
+.comparison-multiselect {
+  position: relative;
+  margin-bottom: 24px;
+  max-width: 800px;
+}
+
+.comparison-multiselect-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 14px;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 200ms ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.comparison-multiselect-trigger:hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+.comparison-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 1;
+  align-items: center;
+}
+
+.comparison-placeholder {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+
+.comparison-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px 4px 12px;
+  background: var(--accent-light);
+  color: var(--accent);
+  border: 1px solid var(--accent-soft);
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: all 150ms ease;
+  animation: comparison-chip-in 200ms ease-out;
+}
+
+@keyframes comparison-chip-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.comparison-chip:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+.comparison-chip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 150ms ease;
+  line-height: 1;
+  margin-left: 2px;
+}
+
+.comparison-chip-remove:hover {
+  background: rgba(239, 68, 68, 0.2);
+}
+
+.comparison-multiselect-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.comparison-multiselect-count {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.comparison-multiselect-arrow {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  transition: transform 200ms ease;
+}
+
+/* ── Dropdown ── */
+.comparison-multiselect-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 300;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: comparison-dropdown-in 200ms ease-out;
+}
+
+@keyframes comparison-dropdown-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.comparison-multiselect-search {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  gap: 8px;
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+}
+
+.comparison-search-icon {
+  font-size: 0.85rem;
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.comparison-multiselect-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.9rem;
+  outline: none;
+  font-family: inherit;
+}
+
+.comparison-multiselect-search input::placeholder {
+  color: var(--text-muted);
+}
+
+.comparison-search-clear {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.comparison-search-clear:hover {
+  color: var(--text);
+  background: var(--surface-alt);
+}
+
+.comparison-multiselect-options {
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.comparison-multiselect-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 120ms ease;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+
+.comparison-multiselect-option:hover {
+  background: var(--accent-light);
+}
+
+.comparison-multiselect-option--checked {
+  background: rgba(13, 148, 136, 0.08);
+  font-weight: 500;
+}
+
+.comparison-multiselect-option input[type="checkbox"] {
+  display: none;
+}
+
+.comparison-option-label {
+  flex: 1;
+}
+
+.comparison-option-check {
+  color: var(--accent);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.comparison-multiselect-empty {
+  padding: 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.comparison-multiselect-actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.comparison-action-btn {
+  flex: 1;
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.comparison-action-btn:hover {
+  background: var(--accent-light);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.comparison-action-btn--danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: #ef4444;
+  color: #ef4444;
+}
+
+/* ── Empty State ── */
+.comparison-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 40px;
+  text-align: center;
+  background: var(--surface);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+  gap: 12px;
+}
+
+.comparison-empty-state h3 {
+  margin: 0;
+  color: var(--text);
+}
+
+.comparison-empty-state h3::after {
+  display: none;
+}
+
+.comparison-empty-state p {
+  color: var(--text-muted);
+  font-size: 0.95rem;
+}
+
+/* ── Export Button ── */
+.comparison-export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: var(--accent);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: #fff;
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 200ms ease;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.25);
+}
+
+.comparison-export-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(13, 148, 136, 0.35);
+}
+
+/* ── Summary Cards ── */
+.comparison-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.comparison-summary-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  transition: all 200ms ease;
+}
+
+.comparison-summary-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--accent);
+}
+
+.comparison-summary-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.comparison-summary-value {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--text);
+  font-family: var(--font-heading);
+}
+
+.comparison-summary-detail {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* ── Chart ── */
+.comparison-chart {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 24px 28px;
+  margin-bottom: 28px;
+  transition: box-shadow 200ms ease;
+}
+
+.comparison-chart:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.comparison-chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.comparison-chart-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.comparison-chart-header h3::after {
+  display: none;
+}
+
+.comparison-chart-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ── Table Section ── */
+.comparison-table-section {
+  margin-top: 12px;
+}
+
+.comparison-table-section h3 {
+  margin-bottom: 18px;
+}
+
+.comparison-table-wrapper {
+  overflow-x: auto;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.comparison-data-table {
+  margin-bottom: 0;
+}
+
+.comparison-table-qnz {
+  position: relative;
+  padding-left: 16px;
+}
+
+.comparison-table-qnz::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--bar-color);
+}
+
+.comparison-cell-cost {
+  color: var(--accent-warning) !important;
+  font-weight: 600 !important;
+}
+
+.comparison-cell-efficiency {
+  color: var(--accent) !important;
+  font-weight: 600 !important;
+}
+
+.comparison-pct-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 100px;
+}
+
+.comparison-pct-fill {
+  height: 6px;
+  border-radius: 3px;
+  min-width: 2px;
+  transition: width 400ms ease;
+}
+
+.comparison-total-row {
+  background: var(--accent-light) !important;
+  border-top: 2px solid var(--accent);
+}
+
+.comparison-total-row:hover {
+  background: rgba(13, 148, 136, 0.1) !important;
+}
+
+/* ── Responsive ── */
+@media (max-width: 1200px) {
+  .comparison-summary {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .comparison-header {
+    flex-direction: column;
+  }
+
+  .comparison-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-mode-toggle {
+    width: 100%;
+  }
+
+  .comparison-mode-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .comparison-multiselect {
+    max-width: 100%;
+  }
+
+  .comparison-chart {
+    padding: 16px;
+  }
+}

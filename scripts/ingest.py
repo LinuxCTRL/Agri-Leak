@@ -38,9 +38,9 @@ def calculate_qnz(date):
 
 
 def parse_qnz_number(filename):
-    """Extract QNZ number from filename like 'QNZ 19_FINAL_TONNAGE...'"""
+    """Extract QNZ number from filename like 'QNZ 19_FINAL_TONNAGE...' or 'TONNAGE_QNZ_11_latest.xlsx'"""
     import re
-    match = re.search(r"QNZ\s*(\d+)", filename, re.IGNORECASE)
+    match = re.search(r"QNZ[\s_]*(\d+)", filename, re.IGNORECASE)
     return int(match.group(1)) if match else None
 
 
