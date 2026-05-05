@@ -2399,17 +2399,23 @@ button, input, select, textarea {
     max-width: 100% !important;
     table-layout: fixed !important;
     border-collapse: collapse !important;
+    font-size: 0.7rem !important;
   }
 
   .data-table th,
   .data-table td {
-    padding: 8px 12px !important;
+    padding: 6px 8px !important;
     width: auto !important;
+    word-wrap: break-word !important;
   }
 
   .data-table th:first-child,
   .data-table td:first-child {
-    width: 25% !important;
+    width: 20% !important;
+  }
+
+  .chart {
+    overflow-x: visible !important;
   }
 
   body {

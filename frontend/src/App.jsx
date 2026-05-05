@@ -10,6 +10,7 @@ import CostBreakdown from './pages/CostBreakdown'
 import Comparison from './pages/Comparison'
 import Varieties from './pages/Varieties'
 import Reports from './pages/Reports'
+import ExportTonnage from './pages/ExportTonnage'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import ChatPopup from './components/ChatPopup'
@@ -46,6 +47,7 @@ function AppContent() {
             <Route path="/domain/:ferme" element={<Domain />} />
             <Route path="/report" element={<Reports />} />
             <Route path="/report/:ferme" element={<Reports />} />
+            <Route path="/export" element={<ExportTonnage />} />
           </Routes>
           <ChatPopup />
         </main>

@@ -5,7 +5,7 @@ import {
   ResponsiveContainer, Cell,
   PieChart, Pie,
 } from 'recharts'
-import { getDomainDetails, getCostPerTon, getProductivity, getFarms } from '../services/api'
+import { getDomainDetails, getCostPerTon, getProductivity, getFarms, getExportTonnage } from '../services/api'
 import { useQnz } from '../context/QnzContext'
 import { tooltipProps, axisTick, cropTypeColors, ACCENT, ACCENT_INFO, ACCENT_WARNING } from '../utils/chartTheme'
 import ChartContainer from '../components/ChartContainer'
@@ -74,6 +74,7 @@ function ReportsDetail() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const reportRef = useRef()
+  const [exportData, setExportData] = useState(null)
   const [data, setData] = useState(null)
   const [costPerTon, setCostPerTon] = useState(null)
   const [productivity, setProductivity] = useState(null)
@@ -90,14 +91,17 @@ function ReportsDetail() {
     setLoading(true)
     setError(null)
     try {
-      const [domainRes, cptRes, prodRes] = await Promise.all([
+      const [domainRes, cptRes, prodRes, exportRes] = await Promise.all([
         getDomainDetails(decodeURIComponent(ferme), { qnz: selectedQnz }),
         getCostPerTon({ qnz: selectedQnz }),
         getProductivity({ qnz: selectedQnz }),
+        getExportTonnage({ qnz: selectedQnz, ferme: decodeURIComponent(ferme) }),
       ])
       setData(domainRes.data)
       setCostPerTon(cptRes.data)
       setProductivity(prodRes.data)
+      const exportRows = exportRes.data || []
+      setExportData(exportRows)
     } catch (err) {
       console.error('Error:', err)
       setError('Failed to load report data')
@@ -214,8 +218,45 @@ function ReportsDetail() {
         </section>
         )}
 
+        {exportData && Array.isArray(exportData) && exportData.length > 0 && (
         <section className="report-section">
-          <h2 className="report-section-title">3. Variety Performance</h2>
+          <h2 className="report-section-title">3. Export Tonnage (Export Data)</h2>
+          <div className="metrics">
+            <div className="metric" style={{ borderLeft: '4px solid #3b82f6' }}><div className="metric-header"><IconTonnage /> <span className="label">Total / Quinzaine</span></div><span className="value">{exportData.reduce((s, r) => s + (r.tonnage_qnz || 0), 0).toLocaleString()} kg</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #10b981' }}><div className="metric-header"><IconTonnage /> <span className="label">Tonnage Cumulé</span></div><span className="value">{exportData.reduce((s, r) => s + (r.tonnage_cumul || 0), 0).toLocaleString()} kg</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #f59e0b' }}><div className="metric-header"><IconTonnage /> <span className="label">Export Total</span></div><span className="value">{exportData.reduce((s, r) => s + (r.export_cumul || 0), 0).toLocaleString()} kg</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #8b5cf6' }}><div className="metric-header"><IconTonnage /> <span className="label">Export Local</span></div><span className="value">{exportData.reduce((s, r) => s + (r.export_local || 0), 0).toLocaleString()} kg</span></div>
+          </div>
+          <div className="metrics" style={{ marginTop: '10px' }}>
+            <div className="metric" style={{ borderLeft: '4px solid #ef4444' }}><div className="metric-header"><IconTonnage /> <span className="label">Écart Total</span></div><span className="value">{exportData.reduce((s, r) => s + (r.ecart_total || 0), 0).toLocaleString()} kg</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #f97316' }}><div className="metric-header"><IconTonnage /> <span className="label">Avg Écart/Ha</span></div><span className="value">{exportData.length > 0 ? (exportData.reduce((s, r) => s + (r.ecart_ha || 0), 0) / exportData.length).toFixed(0) : 0} kg/ha</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #14b8a6' }}><div className="metric-header"><IconTonnage /> <span className="label">Avg Écart %</span></div><span className="value">{exportData.length > 0 ? ((exportData.reduce((s, r) => s + (r.ecart_pct || 0), 0) / exportData.length) * 100).toFixed(1) : 0}%</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #ec4899' }}><div className="metric-header"><IconArea /> <span className="label">Varieties</span></div><span className="value">{new Set(exportData.map(r => r.variety)).size}</span></div>
+          </div>
+          <div className="chart" style={{ marginTop: '20px', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+            <table className="data-table" style={{ width: '100%', fontSize: '0.8rem', minWidth: '700px' }}>
+              <thead><tr><th>Variety</th><th>Serre</th><th>Superficie</th><th>Tonnage QNZ</th><th>Tonnage Cumulé</th><th>Total Export</th><th>Écart T</th><th>Écart %</th></tr></thead>
+              <tbody>
+                {exportData.map((r, i) => (
+                  <tr key={i}>
+                    <td><strong>{r.variety}</strong></td>
+                    <td>{r.serre}</td>
+                    <td>{r.superficie?.toFixed(2)} ha</td>
+                    <td>{r.tonnage_qnz?.toLocaleString()} kg</td>
+                    <td>{r.tonnage_cumul?.toLocaleString()} kg</td>
+                    <td><strong>{r.export_total_all?.toLocaleString()} kg</strong></td>
+                    <td>{r.ecart_total?.toLocaleString()} kg</td>
+                    <td>{r.ecart_pct ? (r.ecart_pct * 100).toFixed(1) + '%' : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+        )}
+
+        <section className="report-section">
+          <h2 className="report-section-title">4. Variety Performance</h2>
           <ChartContainer title="Tonnage by Variety" data={varietyChartData} filename={`${details?.ferme}_varieties`}>
             <div style={{ padding: '15px', width: '100%' }}>
               <ResponsiveContainer width="100%" height={Math.max(280, (by_variety?.length || 0) * 40)}>
@@ -234,7 +275,7 @@ function ReportsDetail() {
         </section>
 
         <section className="report-section">
-          <h2 className="report-section-title">4. Greenhouse (Serre) Breakdown</h2>
+          <h2 className="report-section-title">6. Greenhouse (Serre) Breakdown</h2>
           <ChartContainer title="Tonnage by Serre" data={serreChartData} filename={`${details?.ferme}_serres`}>
             <div style={{ padding: '15px', display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>{serreChartData.map((e, i) => { const max = serreChartData[0]?.value || 1; const pct = ((e.value / max) * 100).toFixed(0); const colors = ['#10b981', '#3b82f6', '#3b82f6', '#3b82f6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6', '#8b5cf6']; const color = colors[i] || '#8b5cf6'; return <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%' }}><span style={{ width: '60px', fontSize: '0.8rem', fontWeight: '600', color: '#333', textAlign: 'right', flexShrink: 0 }}>{e.name}</span><div style={{ flex: 1, height: '20px', background: '#eee', borderRadius: '4px', minWidth: '50px' }}><div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: '4px' }} /></div><span style={{ width: '65px', fontSize: '0.8rem', fontWeight: '600', textAlign: 'right', color: '#333', flexShrink: 0 }}>{formatNum(e.value)}</span><span style={{ width: '40px', fontSize: '0.7rem', color: '#666', textAlign: 'right', flexShrink: 0 }}>{pct}%</span></div>})}</div>
           </ChartContainer>
@@ -244,7 +285,7 @@ function ReportsDetail() {
         </section>
 
         <section className="report-section">
-          <h2 className="report-section-title">5. Daily Harvest Pattern</h2>
+          <h2 className="report-section-title">7. Daily Harvest Pattern</h2>
           <ChartContainer title="Daily Tonnage (Top 20 Days)" data={dailyChartData} filename={`${details?.ferme}_daily`}>
             <div style={{ padding: '10px', width: '100%' }}>
               <ResponsiveContainer width="100%" height={280}>
@@ -260,7 +301,7 @@ function ReportsDetail() {
         </section>
 
         <section className="report-section">
-          <h2 className="report-section-title">6. Efficiency Benchmarking</h2>
+          <h2 className="report-section-title">8. Efficiency Benchmarking</h2>
           <div className="metrics">
             <div className="metric" style={{ borderLeft: '4px solid var(--accent-success)' }}><span className="label">Yield Rank</span><span className="value">#{farmRank} / {allFarmProductivity.length}</span></div>
             <div className="metric" style={{ borderLeft: '4px solid var(--accent-warning)' }}><span className="label">Cost Efficiency Rank</span><span className="value">#{costRank} / {totalFarmsInCost}</span></div>

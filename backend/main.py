@@ -85,6 +85,11 @@ def get_costs_df():
     return df
 
 
+def get_export_df():
+    """Load export tonnage data from separate parquet."""
+    return pd.read_parquet(PROCESSED_DIR / "export_combined.parquet")
+
+
 @app.get("/")
 def root():
     return {"message": "Agricultural Data Lake API", "version": "1.0.0"}
@@ -128,35 +133,23 @@ def get_tonnage(
 def get_export_tonnage(
     qnz: Optional[int] = None,
     ferme: Optional[str] = None,
-    variety: Optional[str] = None,
-    type: Optional[str] = None,
 ):
-    """Get export tonnage data (quinzaine-level aggregates from export files)."""
-    df = get_tonnage_df()
-    
-    # Filter to export source only
-    df = df[df.get("source") == "export"]
-    
+    """Get export tonnage from the dedicated export parquet."""
+    df = get_export_df()
+
     if qnz:
         df = df[df["qnz"] == qnz]
     if ferme:
         df = df[df["ferme"] == normalize_farm_name(ferme)]
-    if variety:
-        df = df[df["variety"] == variety]
-    if type:
-        df = df[df["type"] == type]
-    
-    # Select export-specific columns
-    export_cols = [
-        "ferme", "variety", "type", "serre", "superficie", "plant_date", "qnz",
-        "tonnage", "tonnage_qnz", "tonnage_ha", "export_qnz", "export_total",
-        "export_ha", "export_total_all", "ecart_total", "ecart_ha", "ecart_pct",
-        "plantation_week", "group", "club", "code"
-    ]
-    available_cols = [c for c in export_cols if c in df.columns]
-    df = df[available_cols]
-    
+
     return _sanitize_records(df)
+
+
+@app.get("/api/export-available-qnz")
+def get_export_available_qnz():
+    """Available QNZ values in export data."""
+    df = get_export_df()
+    return sorted(df["qnz"].dropna().unique().astype(int).tolist())
 
 
 @app.get("/api/available-qnz")
