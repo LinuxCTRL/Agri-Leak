@@ -896,6 +896,92 @@ async def chat(request: Request):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
+@app.get("/api/ai/summarize")
+async def summarize_farm(ferme: str, qnz: Optional[int] = None):
+    """Generate an AI summary for a specific farm and quinzaine."""
+    # Re-use the data fetching logic from get_domain_details
+    domain_data = get_domain_details(ferme, qnz)
+    if isinstance(domain_data, JSONResponse):
+        return domain_data
+
+    # Extract relevant info for the prompt
+    details = domain_data.get("details", {})
+    summary = domain_data.get("summary", {})
+    by_variety = domain_data.get("by_variety", [])
+    cost = domain_data.get("cost", {})
+    
+    # Format a compact data string for the AI
+    data_str = f"""
+    Farm: {details.get('ferme')} (Code: {details.get('code')})
+    Group: {details.get('group')}, Club: {details.get('club')}
+    Period: QNZ {qnz if qnz and qnz != 0 else 'All'}
+    
+    Production:
+    - Total Tonnage: {summary.get('total_tonnage'):,.0f} kg
+    - Surface: {summary.get('total_superficie'):.2f} ha
+    - Yield: {summary.get('yield_per_ha'):.0f} kg/ha
+    - Varieties: {summary.get('varieties_count')}
+    
+    Varieties:
+    {", ".join([f"{v['variety']} ({v['tonnage']:,.0f}kg, {v['yield_per_ha']:.0f}kg/ha)" for v in by_variety[:5]])}
+    """
+    
+    if cost:
+        data_str += f"""
+    Costs:
+    - Total Cost: {cost.get('total_cost'):,.0f} MAD
+    - Cost per Ton: {cost.get('cost_per_ton'):.2f} MAD
+    - Cost per Ha: {cost.get('cost_per_ha'):,.0f} MAD
+    - Breakdown: Labor={cost.get('main_doeuvre'):,.0f}, Equipment={cost.get('echassier'):,.0f}, Fixed={cost.get('poste_fixe'):,.0f}
+    """
+
+    prompt = f"""
+    You are an expert agricultural analyst. Provide a concise, professional, and insightful executive summary of the following farm performance report. 
+    Focus on:
+    1. Overall productivity compared to typical yields (if data suggests).
+    2. Cost efficiency.
+    3. Notable variety performance.
+    4. One actionable recommendation.
+    
+    Keep it under 150 words. Use bullet points for clarity.
+    
+    Data:
+    {data_str}
+    """
+
+    api_key = os.environ.get("DEEPSEEK_API_KEY")
+    if not api_key:
+        return JSONResponse({"error": "DEEPSEEK_API_KEY not configured"}, status_code=500)
+
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.deepseek.com/v1/chat/completions",
+                json={
+                    "model": "deepseek-chat",
+                    "messages": [
+                        {"role": "system", "content": "You are a professional agricultural data analyst."},
+                        {"role": "user", "content": prompt}
+                    ],
+                    "temperature": 0.5,
+                },
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                timeout=60.0
+            )
+            result = response.json()
+            if "choices" not in result:
+                return JSONResponse({"error": "AI API error", "details": result}, status_code=500)
+            
+            answer = result["choices"][0]["message"]["content"]
+            return {"summary": answer}
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

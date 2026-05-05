@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Cell,
   PieChart, Pie,
 } from 'recharts'
-import { getDomainDetails, getCostPerTon, getProductivity, getFarms, getExportTonnage } from '../services/api'
+import {
+  getDomainDetails, getCostPerTon, getProductivity,
+  getFarms, getExportTonnage, getAISummary
+} from '../services/api'
 import { useQnz } from '../context/QnzContext'
 import { tooltipProps, axisTick, cropTypeColors, ACCENT, ACCENT_INFO, ACCENT_WARNING } from '../utils/chartTheme'
 import ChartContainer from '../components/ChartContainer'
@@ -17,6 +22,7 @@ function IconTonnage() { return <svg width="18" height="18" viewBox="0 0 24 24" 
 function IconArea() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg> }
 function IconYield() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg> }
 function IconEfficiency() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> }
+function IconSparkles() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg> }
 
 function ReportsSelector() {
   const [farms, setFarms] = useState([])
@@ -82,6 +88,11 @@ function ReportsDetail() {
   const [error, setError] = useState(null)
   const { availableQnz } = useQnz()
 
+  // AI Summary state
+  const [aiSummary, setAiSummary] = useState(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState(null)
+
   const qnzParam = searchParams.get('qnz')
   const selectedQnz = qnzParam ? parseInt(qnzParam) : 0
 
@@ -90,6 +101,7 @@ function ReportsDetail() {
   const loadData = async () => {
     setLoading(true)
     setError(null)
+    setAiSummary(null) // Reset summary on data change
     try {
       const [domainRes, cptRes, prodRes, exportRes] = await Promise.all([
         getDomainDetails(decodeURIComponent(ferme), { qnz: selectedQnz }),
@@ -106,6 +118,20 @@ function ReportsDetail() {
       console.error('Error:', err)
       setError('Failed to load report data')
     } finally { setLoading(false) }
+  }
+
+  const handleAISummarize = async () => {
+    setAiLoading(true)
+    setAiError(null)
+    try {
+      const res = await getAISummary({ ferme: decodeURIComponent(ferme), qnz: selectedQnz })
+      setAiSummary(res.data.summary)
+    } catch (err) {
+      console.error('AI Error:', err)
+      setAiError(err.response?.data?.error || 'Failed to generate AI summary')
+    } finally {
+      setAiLoading(false)
+    }
   }
 
   const formatDate = (d) => d ? new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) : '—'
@@ -158,6 +184,14 @@ function ReportsDetail() {
         </div>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexShrink: 0 }}>
           <button className="report-btn" onClick={() => navigate(-1)}>Back</button>
+          <button 
+            className="report-btn report-btn--ai" 
+            onClick={handleAISummarize}
+            disabled={aiLoading}
+          >
+            <IconSparkles />
+            {aiLoading ? 'Thinking...' : 'AI Summarize'}
+          </button>
           <button className="report-btn report-btn--primary" onClick={handlePrint}>Print</button>
         </div>
       </div>
@@ -173,6 +207,35 @@ function ReportsDetail() {
           </div>
           <p className="report-period">{qnzLabel} — Generated on {reportDate}</p>
         </div>
+
+        {/* AI Summary Section */}
+        {(aiLoading || aiSummary || aiError) && (
+          <div className={`ai-summary-card ${(aiLoading || aiError) ? 'no-print' : ''}`}>
+            <div className="ai-summary-header">
+              <IconSparkles />
+              <span className="ai-summary-title">AI Executive Summary</span>
+            </div>
+            
+            {aiLoading && (
+              <div className="ai-summary-loading">
+                <div className="loading-spinner" style={{ width: '20px', height: '20px', borderWidth: '2px' }}></div>
+                Analyzing farm performance data...
+              </div>
+            )}
+            
+            {aiError && (
+              <div className="ai-summary-error">
+                {aiError}
+              </div>
+            )}
+            
+            {aiSummary && (
+              <div className="ai-summary-content">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{aiSummary}</ReactMarkdown>
+              </div>
+            )}
+          </div>
+        )}
 
         <section className="report-section">
           <h2 className="report-section-title">1. Production Overview</h2>
@@ -235,17 +298,15 @@ function ReportsDetail() {
           </div>
           <div className="chart" style={{ marginTop: '20px', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table className="data-table" style={{ width: '100%', fontSize: '0.8rem', minWidth: '700px' }}>
-              <thead><tr><th>Variety</th><th>Serre</th><th>Superficie</th><th>Tonnage QNZ</th><th>Tonnage Cumulé</th><th>Total Export</th><th>Écart T</th><th>Écart %</th></tr></thead>
+              <thead><tr><th>Variety</th><th>Tonnage QNZ</th><th>Tonnage Cumulé</th><th>Total Export</th><th>Écart %</th></tr></thead>
               <tbody>
                 {exportData.map((r, i) => (
                   <tr key={i}>
                     <td><strong>{r.variety}</strong></td>
-                    <td>{r.serre}</td>
-                    <td>{r.superficie?.toFixed(2)} ha</td>
+                    
                     <td>{r.tonnage_qnz?.toLocaleString()} kg</td>
                     <td>{r.tonnage_cumul?.toLocaleString()} kg</td>
                     <td><strong>{r.export_total_all?.toLocaleString()} kg</strong></td>
-                    <td>{r.ecart_total?.toLocaleString()} kg</td>
                     <td>{r.ecart_pct ? (r.ecart_pct * 100).toFixed(1) + '%' : '—'}</td>
                   </tr>
                 ))}
