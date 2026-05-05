@@ -122,6 +122,43 @@ def get_tonnage(
     return _sanitize_records(df)
 
 
+# ── Export Tonnage Endpoints ────────────────────────────────────────────
+
+@app.get("/api/export-tonnage")
+def get_export_tonnage(
+    qnz: Optional[int] = None,
+    ferme: Optional[str] = None,
+    variety: Optional[str] = None,
+    type: Optional[str] = None,
+):
+    """Get export tonnage data (quinzaine-level aggregates from export files)."""
+    df = get_tonnage_df()
+    
+    # Filter to export source only
+    df = df[df.get("source") == "export"]
+    
+    if qnz:
+        df = df[df["qnz"] == qnz]
+    if ferme:
+        df = df[df["ferme"] == normalize_farm_name(ferme)]
+    if variety:
+        df = df[df["variety"] == variety]
+    if type:
+        df = df[df["type"] == type]
+    
+    # Select export-specific columns
+    export_cols = [
+        "ferme", "variety", "type", "serre", "superficie", "plant_date", "qnz",
+        "tonnage", "tonnage_qnz", "tonnage_ha", "export_qnz", "export_total",
+        "export_ha", "export_total_all", "ecart_total", "ecart_ha", "ecart_pct",
+        "plantation_week", "group", "club", "code"
+    ]
+    available_cols = [c for c in export_cols if c in df.columns]
+    df = df[available_cols]
+    
+    return _sanitize_records(df)
+
+
 @app.get("/api/available-qnz")
 def get_available_qnz():
     """Returns a unique sorted list of all available quinzaines from the data lake."""
@@ -140,6 +177,7 @@ def get_tonnage_summary(
 ):
     df = get_tonnage_df()
 
+    # If qnz is None, default to latest. If qnz is 0, it means ALL.
     if qnz is None and not start_date and not end_date:
         qnz = int(df["qnz"].max())
 
@@ -151,21 +189,20 @@ def get_tonnage_summary(
         df = df[df["group"] == group]
     if club:
         df = df[df["club"] == club]
-    if qnz:
+    if qnz and qnz != 0:
         df = df[df["qnz"] == qnz]
 
     total_tonnage = df["tonnage"].sum()
 
     # Get cost data for the same filter
     costs_df = get_costs_df()
-    if qnz:
+    if qnz and qnz != 0:
         qnz_costs = costs_df[costs_df["qnz"] == qnz]
         total_cost = qnz_costs["Montant Total"].sum()
     elif start_date or end_date:
-        # Note: cost data doesn't have daily dates, only QNZ. 
-        # This is an approximation or we skip cost for date ranges.
         total_cost = 0
     else:
+        # Sum all costs for the global view
         total_cost = costs_df["Montant Total"].sum()
 
     by_farm = df.groupby("ferme").agg(
@@ -203,7 +240,8 @@ def get_groups(qnz: Optional[int] = None):
     df = get_tonnage_df()
     if qnz is None:
         qnz = int(df["qnz"].max())
-    df = df[df["qnz"] == qnz]
+    if qnz != 0:
+        df = df[df["qnz"] == qnz]
     return sorted(df["group"].unique().tolist())
 
 
@@ -212,7 +250,8 @@ def get_clubs(qnz: Optional[int] = None):
     df = get_tonnage_df()
     if qnz is None:
         qnz = int(df["qnz"].max())
-    df = df[df["qnz"] == qnz]
+    if qnz != 0:
+        df = df[df["qnz"] == qnz]
     return sorted(df["club"].unique().tolist())
 
 
@@ -221,7 +260,8 @@ def get_farms(qnz: Optional[int] = None):
     df = get_tonnage_df()
     if qnz is None:
         qnz = int(df["qnz"].max())
-    df = df[df["qnz"] == qnz]
+    if qnz != 0:
+        df = df[df["qnz"] == qnz]
     by_farm = df.groupby("ferme").agg(
         tonnage=("tonnage", "sum"),
         superficie=("superficie", lambda x: x.drop_duplicates().sum()),
@@ -232,6 +272,7 @@ def get_farms(qnz: Optional[int] = None):
         code=("code", "first")
     ).reset_index().sort_values("tonnage", ascending=False)
     return _sanitize_records(by_farm)
+
 
 
 @app.get("/api/tonnage/qnz")
@@ -286,8 +327,9 @@ def get_cost_per_ton(qnz: Optional[int] = None):
     if qnz is None:
         qnz = int(tonnage_df["qnz"].max())
         
-    tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
-    costs_df = costs_df[costs_df["qnz"] == qnz]
+    if qnz != 0:
+        tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
+        costs_df = costs_df[costs_df["qnz"] == qnz]
 
     tonnage_by_ferme = tonnage_df.groupby("ferme")["tonnage"].sum().reset_index()
     tonnage_by_ferme.columns = ["Domaine", "total_tonnage"]
@@ -354,8 +396,9 @@ def get_productivity(qnz: Optional[int] = None):
     if qnz is None:
         qnz = int(tonnage_df["qnz"].max())
         
-    tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
-    costs_df = costs_df[costs_df["qnz"] == qnz]
+    if qnz != 0:
+        tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
+        costs_df = costs_df[costs_df["qnz"] == qnz]
 
     # By farm
     by_farm = tonnage_df.groupby("ferme").agg(
@@ -420,7 +463,8 @@ def get_varieties(qnz: Optional[int] = None):
     if qnz is None:
         qnz = int(tonnage_df["qnz"].max())
         
-    tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
+    if qnz != 0:
+        tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
     
     by_variety = tonnage_df.groupby(["variety", "type"]).agg(
         tonnage=("tonnage", "sum"),
@@ -446,8 +490,9 @@ def get_crop_types(qnz: Optional[int] = None):
     if qnz is None:
         qnz = int(tonnage_df["qnz"].max())
         
-    tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
-    costs_df = costs_df[costs_df["qnz"] == qnz]
+    if qnz != 0:
+        tonnage_df = tonnage_df[tonnage_df["qnz"] == qnz]
+        costs_df = costs_df[costs_df["qnz"] == qnz]
 
     # Tonnage by type
     by_type = tonnage_df.groupby("type").agg(
@@ -493,7 +538,7 @@ def get_cost_breakdown(qnz: Optional[int] = None):
     """Cost category breakdown across all farms for a specific quinzaine or all."""
     costs_df = get_costs_df()
 
-    if qnz is not None:
+    if qnz is not None and qnz != 0:
         costs_df = costs_df[costs_df["qnz"] == qnz]
 
     # Aggregated categories
@@ -540,7 +585,11 @@ def get_group_details(group_name: str, qnz: Optional[int] = None):
     if qnz is None:
         qnz = int(df["qnz"].max())
 
-    group_df = df[(df["group"] == group_name) & (df["qnz"] == qnz)]
+    if qnz != 0:
+        group_df = df[(df["group"] == group_name) & (df["qnz"] == qnz)]
+    else:
+        group_df = df[df["group"] == group_name]
+
     summary = {
         "total_tonnage": float(group_df["tonnage"].sum()),
         "farms": group_df["ferme"].nunique(),
@@ -571,7 +620,11 @@ def get_club_details(club_name: str, qnz: Optional[int] = None):
     if qnz is None:
         qnz = int(df["qnz"].max())
 
-    club_df = df[(df["club"] == club_name) & (df["qnz"] == qnz)]
+    if qnz != 0:
+        club_df = df[(df["club"] == club_name) & (df["qnz"] == qnz)]
+    else:
+        club_df = df[df["club"] == club_name]
+
     summary = {
         "total_tonnage": float(club_df["tonnage"].sum()),
         "farms": club_df["ferme"].nunique(),
@@ -608,8 +661,12 @@ def get_domain_details(ferme_name: str, qnz: Optional[int] = None):
     if qnz is None:
         qnz = int(tonnage_df["qnz"].max())
 
-    domain_df = tonnage_df[(tonnage_df["ferme"] == canonical_name) & (tonnage_df["qnz"] == qnz)]
-    cost_df = costs_df[(costs_df["Domaine"] == canonical_name) & (costs_df["qnz"] == qnz)]
+    if qnz != 0:
+        domain_df = tonnage_df[(tonnage_df["ferme"] == canonical_name) & (tonnage_df["qnz"] == qnz)]
+        cost_df = costs_df[(costs_df["Domaine"] == canonical_name) & (costs_df["qnz"] == qnz)]
+    else:
+        domain_df = tonnage_df[tonnage_df["ferme"] == canonical_name]
+        cost_df = costs_df[costs_df["Domaine"] == canonical_name]
 
     if len(domain_df) == 0:
         return JSONResponse(status_code=404, content={"error": f"No data found for {ferme_name} in QNZ {qnz}"})
@@ -714,14 +771,18 @@ def build_context():
     tonnage_df = get_tonnage_df()
     costs_df = get_costs_df()
 
+    import datetime
+    now = datetime.datetime.now().strftime("%Y-%m-%d")
+
     total_ton = tonnage_df["tonnage"].sum()
     total_cost = costs_df["Montant Total"].sum()
-    farms = tonnage_df["ferme"].nunique()
-    varieties = tonnage_df["variety"].nunique()
-    groups = tonnage_df["group"].nunique()
-    clubs = tonnage_df["club"].nunique()
+    farms_count = tonnage_df["ferme"].nunique()
+    varieties_count = tonnage_df["variety"].nunique()
+    groups_count = tonnage_df["group"].nunique()
+    clubs_count = tonnage_df["club"].nunique()
 
     available_qnz = sorted(tonnage_df["qnz"].unique().tolist())
+    latest_qnz = available_qnz[-1] if available_qnz else None
 
     by_qnz = tonnage_df.groupby("qnz").agg(
         tonnage=("tonnage", "sum"),
@@ -730,52 +791,73 @@ def build_context():
         end_date=("date", "max")
     ).reset_index().sort_values("qnz")
 
-    by_farm = tonnage_df.groupby("ferme")["tonnage"].sum().sort_values(ascending=False)
-    top_farms = by_farm.head(10)
-    all_farms = tonnage_df["ferme"].unique().tolist()
+    # Farm Metadata and Costs Summary
+    farm_production = tonnage_df.groupby("ferme").agg(
+        group=("group", "first"),
+        club=("club", "first"),
+        superficie=("superficie", "max"),
+        total_tonnage=("tonnage", "sum")
+    )
+    
+    farm_costs = costs_df.groupby("Domaine")["Montant Total"].sum()
+    farm_meta = pd.merge(farm_production, farm_costs, left_index=True, right_index=True, how="left").sort_values("total_tonnage", ascending=False)
+    farm_meta = farm_meta.rename(columns={"Montant Total": "total_cost"})
 
-    by_variety = tonnage_df.groupby("variety")["tonnage"].sum().sort_values(ascending=False).head(10)
+    # Global Cost Breakdown
+    cost_categories = {
+        "Main D'oeuvre": costs_df["Main D'oeuvrs"].sum(),
+        "Echassier": costs_df["ECHASSIER"].fillna(0).sum(),
+        "Poste Fixe": costs_df["Poste Fixe"].fillna(0).sum(),
+        "Dépenses Externes": costs_df["Dépences externe"].fillna(0).sum(),
+        "Dépenses Internes": costs_df["Autre Dépences interne"].fillna(0).sum(),
+    }
+    cost_summary = pd.Series(cost_categories).sort_values(ascending=False)
 
+    # Detailed Tonnage by farm and QNZ - FULL TABLE
     by_farm_qnz = tonnage_df.groupby(["ferme", "qnz"])["tonnage"].sum().unstack(fill_value=0)
+    
+    # Top varieties
+    by_variety = tonnage_df.groupby("variety")["tonnage"].sum().sort_values(ascending=False).head(20)
 
     context = f"""
-You are an agricultural data analyst for a Moroccan tomato farm data lake.
-Current data:
+You are an agricultural data analyst for a Moroccan tomato farm data lake (Agri-Leak).
+Current date: {now}
+Latest data available up to QNZ {latest_qnz}.
+
+Current data overview:
 - Total tonnage: {total_ton:,.0f} kg
 - Total costs: {total_cost:,.0f} MAD
-- Farms: {farms}
-- Varieties: {varieties}
-- Groups: {groups}
-- Clubs: {clubs}
-- Available QNZ periods: {available_qnz}
+- Farms: {farms_count}
+- Varieties: {varieties_count}
+- Groups: {groups_count}
+- Clubs: {clubs_count}
 
-Tonnage by QNZ (all farms combined):
-{by_qnz.to_string()}
+### Global Cost Breakdown:
+{cost_summary.to_string()}
 
-All farms ({len(all_farms)} total): {all_farms}
+### Tonnage by QNZ (Combined):
+{by_qnz.to_string(index=False)}
 
-Top 10 farms by total tonnage:
-{top_farms.to_string()}
+### Farm Metadata (Group, Club, Surface, Total Tonnage, Total Cost):
+{farm_meta.to_string()}
 
-Top 10 varieties by total tonnage:
+### Top 20 Varieties:
 {by_variety.to_string()}
 
-Tonnage by farm and QNZ (sample):
-{by_farm_qnz.head(10).to_string()}
-
-Cost data covers: {sorted(costs_df["Domaine"].unique().tolist())[:10]}...
+### DETAILED TONNAGE BY FARM AND QNZ (CRITICAL):
+Use this table to answer specific questions about a farm's harvest in a specific quinzaine.
+{by_farm_qnz.to_string()}
 
 DATA_SCHEMA:
-- tonnage table: ferme (farm name), group, club, code, variety, type, serre, superficie (ha), plant_date, date, qnz, year_start, year_end, tonnage (kg), global_tonnage
-- costs table: Domaine (farm name), Super (surface ha), Main D'oeuvrs, ECHASSIER, Poste Fixe, Dépences externe, Autre Dépences interne, Montant Total, domain_id, qnz
+- tonnage: ferme (farm), group, club, code, variety, type, serre, superficie (ha), date, qnz, tonnage (kg)
+- costs: Domaine (farm), Super (ha), Main D'oeuvrs, ECHASSIER, Poste Fixe, Dépences externe, Autre Dépences interne, Montant Total, qnz
 
-IMPORTANT: When user asks about a specific farm in a specific QNZ, filter by both ferme and qnz columns.
-For example: "FARM_NAME at QNZ 21" means filter where ferme == "FARM_NAME" and qnz == 21, then sum tonnage.
+IMPORTANT:
+- When asked about "FARM_NAME at QNZ X", look up the row "FARM_NAME" and column "X" in the DETAILED TONNAGE table.
+- All numbers are in kg (tonnage) or MAD (costs).
+- Superficie is in hectares (ha).
 
-Answer questions about tonnage, costs, productivity, farms, varieties, groups, clubs, and specific QNZ periods.
-
-Format numbers with commas for thousands. Use kg for tonnage, MAD for costs, ha for superficie.
-Always provide specific numbers from the data when answering.
+Answer clearly and provide specific numbers.
 """
     return context
 

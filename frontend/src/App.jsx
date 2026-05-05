@@ -9,6 +9,7 @@ import Productivity from './pages/Productivity'
 import CostBreakdown from './pages/CostBreakdown'
 import Comparison from './pages/Comparison'
 import Varieties from './pages/Varieties'
+import Reports from './pages/Reports'
 import Sidebar from './components/Sidebar'
 import Topbar from './components/Topbar'
 import ChatPopup from './components/ChatPopup'
@@ -43,6 +44,8 @@ function AppContent() {
             <Route path="/cost-per-ton" element={<CostPerTon />} />
             <Route path="/cost-breakdown" element={<CostBreakdown />} />
             <Route path="/domain/:ferme" element={<Domain />} />
+            <Route path="/report" element={<Reports />} />
+            <Route path="/report/:ferme" element={<Reports />} />
           </Routes>
           <ChatPopup />
         </main>

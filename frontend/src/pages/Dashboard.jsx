@@ -13,9 +13,18 @@ function Dashboard() {
   const [data, setData] = useState(null)
   const [farms, setFarms] = useState([])
   const [cropTypes, setCropTypes] = useState([])
+  const [qnzRange, setQnzRange] = useState({ min: 1, max: 22 })
   const [loading, setLoading] = useState(true)
   const navigate = useNavigate()
-  const { selectedQnz } = useQnz()
+  const { selectedQnz, availableQnz } = useQnz()
+
+  useEffect(() => {
+    if (availableQnz && availableQnz.length > 0) {
+      const minQ = Math.min(...availableQnz)
+      const maxQ = Math.max(...availableQnz)
+      setQnzRange({ min: Math.min(minQ, 1), max: maxQ })
+    }
+  }, [availableQnz])
 
   useEffect(() => {
     setLoading(true)
@@ -68,6 +77,20 @@ function Dashboard() {
   const byGroupData = (data?.summary?.by_group ?? [])
     .map((g) => ({ name: g.group, value: g.tonnage }))
 
+  const renderCustomBarLabel = ({ x, y, width, height, value }) => {
+    return (
+      <text 
+        x={x + width + 10} 
+        y={y + height / 2} 
+        fill="var(--text-muted)" 
+        dominantBaseline="middle"
+        style={{ fontSize: '0.75rem', fontWeight: '600' }}
+      >
+        {formatNum(value)}
+      </text>
+    )
+  }
+
   // 6.3 Tonnage by Crop Type — horizontal bar chart with per-type colours
   const byCropTypeData = cropTypes.map((ct) => ({
     name: ct.type,
@@ -77,7 +100,7 @@ function Dashboard() {
 
   return (
     <div className="page">
-      <h2>📊 Dashboard</h2>
+      <h2>📊 Dashboard {selectedQnz === 0 ? `(QNZ ${qnzRange.min} - ${qnzRange.max})` : `(QNZ ${selectedQnz})`}</h2>
 
       <div className="metrics">
         <div className="metric" style={{ borderLeft: '4px solid var(--accent)' }}>
@@ -134,31 +157,40 @@ function Dashboard() {
           filename="top_farms_tonnage"
         >
           {topFarmsData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={Math.max(200, topFarmsData.length * 36)}>
+            <ResponsiveContainer width="100%" height={Math.max(300, topFarmsData.length * 40)}>
               <BarChart
                 data={topFarmsData}
                 layout="vertical"
-                margin={{ top: 4, right: 24, left: 8, bottom: 4 }}
+                margin={{ top: 10, right: 60, left: 20, bottom: 10 }}
               >
                 <XAxis type="number" hide />
                 <YAxis
                   type="category"
                   dataKey="name"
                   width={140}
-                  tick={axisTick}
+                  tick={{ ...axisTick, fontSize: 11, fontWeight: 500 }}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <Tooltip
                   {...tooltipProps}
+                  cursor={{ fill: 'var(--bg-card)', opacity: 0.4 }}
                   formatter={(v) => [v.toLocaleString() + ' kg', 'Tonnage']}
                 />
                 <Bar
                   dataKey="value"
-                  radius={[0, 6, 6, 0]}
+                  radius={[0, 10, 10, 0]}
+                  barSize={20}
                   style={{ cursor: 'pointer' }}
                   onClick={(entry) => handleFarmClick(entry.name)}
+                  label={renderCustomBarLabel}
                 >
                   {topFarmsData.map((_, i) => (
-                    <Cell key={i} fill={ACCENT} />
+                    <Cell 
+                      key={i} 
+                      fill="var(--accent)"
+                      fillOpacity={1 - (i * 0.05)}
+                    />
                   ))}
                 </Bar>
               </BarChart>
@@ -173,26 +205,38 @@ function Dashboard() {
           filename="tonnage_by_group"
         >
           {byGroupData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={Math.max(200, byGroupData.length * 36)}>
+            <ResponsiveContainer width="100%" height={Math.max(300, byGroupData.length * 45)}>
               <BarChart
                 data={byGroupData}
                 layout="vertical"
-                margin={{ top: 4, right: 24, left: 8, bottom: 4 }}
+                margin={{ top: 10, right: 60, left: 20, bottom: 10 }}
               >
                 <XAxis type="number" hide />
                 <YAxis
                   type="category"
                   dataKey="name"
                   width={140}
-                  tick={axisTick}
+                  tick={{ ...axisTick, fontSize: 11, fontWeight: 500 }}
+                  axisLine={false}
+                  tickLine={false}
                 />
                 <Tooltip
                   {...tooltipProps}
+                  cursor={{ fill: 'var(--bg-card)', opacity: 0.4 }}
                   formatter={(v) => [v.toLocaleString() + ' kg', 'Tonnage']}
                 />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]}>
+                <Bar 
+                  dataKey="value" 
+                  radius={[0, 10, 10, 0]}
+                  barSize={24}
+                  label={renderCustomBarLabel}
+                >
                   {byGroupData.map((_, i) => (
-                    <Cell key={i} fill={ACCENT} />
+                    <Cell 
+                      key={i} 
+                      fill="var(--accent-info)" 
+                      fillOpacity={1 - (i * 0.08)}
+                    />
                   ))}
                 </Bar>
               </BarChart>

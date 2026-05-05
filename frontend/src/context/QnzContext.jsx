@@ -13,9 +13,8 @@ export function QnzProvider({ children }) {
       const qnzList = res.data
       setAvailableQnz(qnzList)
       
-      // Default to the latest (highest) QNZ if none saved
-      const latestQnz = qnzList.length > 0 ? Math.max(...qnzList) : 22
-      const defaultQnz = saved ? Number(saved) : latestQnz
+      // Default to 0 (All Quinzaines / Cumulative) if none saved
+      const defaultQnz = saved !== null ? Number(saved) : 0
       
       setSelectedQnz(defaultQnz)
       localStorage.setItem('selectedQnz', defaultQnz)

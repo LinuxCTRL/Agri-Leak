@@ -42,6 +42,8 @@ export const tooltipProps = {
 export const axisTick = { fill: 'var(--text-muted)', fontSize: 12 }
 export const ACCENT = 'var(--accent)'
 export const ACCENT_WARNING = 'var(--warning)'
+export const ACCENT_INFO = 'var(--accent-info)'
+export const ACCENT_SUCCESS = 'var(--accent-success)'
 
 export const cropTypeColors = {
   'CERISE ALLONGE': '#ef4444',

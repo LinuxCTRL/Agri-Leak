@@ -122,6 +122,18 @@ function IconMenu() {
   )
 }
 
+function IconReports() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
+    </svg>
+  )
+}
+
 // ─── NavItem sub-component ─────────────────────────────────────────────────
 function NavItem({ to, icon, label, collapsed }) {
   const location = useLocation()
@@ -148,7 +160,6 @@ function Sidebar({ onWidthChange }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
 
-  const { selectedQnz, setSelectedQnz, availableQnz } = useQnz()
   const { themeId, theme, setThemeId, availableThemes } = useTheme()
 
   // Mobile detection via matchMedia
@@ -209,6 +220,7 @@ function Sidebar({ onWidthChange }) {
     { to: '/cost-per-ton',   icon: <IconCostTon />,       label: 'Cost/Ton' },
     { to: '/cost-breakdown', icon: <IconCostBreakdown />, label: 'Cost Breakdown' },
     { to: '/comparison',     icon: <IconProductivity />,  label: 'QNZ Comparison' },
+    { to: '/report',         icon: <IconReports />,       label: 'Reports' },
   ]
 
   // On mobile, sidebar is an overlay triggered by mobileOpen
@@ -293,52 +305,22 @@ function Sidebar({ onWidthChange }) {
           </div>
         </nav>
 
-        {/* ── QNZ selector ── */}
-        {availableQnz.length > 0 && (
-          <div className="sidebar-qnz">
-            {!collapsed || isMobile ? (
-              <>
-                <label className="sidebar-qnz-label">QNZ</label>
-                <select
-                  className="sidebar-qnz-select"
-                  value={selectedQnz || ''}
-                  onChange={(e) => setSelectedQnz(Number(e.target.value))}
-                >
-                  {availableQnz.map((q) => (
-                    <option key={q} value={q}>
-                      QNZ {q}
-                    </option>
-                  ))}
-                </select>
-              </>
-            ) : (
-              <div className="sidebar-qnz-collapsed" title={`QNZ ${selectedQnz}`}>
-                <span className="sidebar-qnz-badge">{selectedQnz}</span>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* ── Footer: theme selector ── */}
         <div className="sidebar-footer">
           {(!collapsed || isMobile) ? (
             <div className="sidebar-theme-picker">
               <span className="sidebar-theme-label">Theme</span>
-              <div className="sidebar-theme-options">
+              <select
+                className="sidebar-theme-select"
+                value={themeId}
+                onChange={(e) => setThemeId(e.target.value)}
+              >
                 {availableThemes.map((t) => (
-                  <button
-                    key={t.id}
-                    className={`sidebar-theme-option${t.id === themeId ? ' sidebar-theme-option--active' : ''}`}
-                    onClick={() => setThemeId(t.id)}
-                    title={t.description}
-                    aria-label={t.name}
-                    aria-pressed={t.id === themeId}
-                  >
-                    <span className="sidebar-theme-option-icon">{t.icon}</span>
-                    <span className="sidebar-theme-option-name">{t.name}</span>
-                  </button>
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
                 ))}
-              </div>
+              </select>
             </div>
           ) : (
             <button

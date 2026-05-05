@@ -6,7 +6,14 @@ import {
 } from 'recharts'
 import { getCostPerTon } from '../services/api'
 import { useQnz } from '../context/QnzContext'
-import { tooltipProps, axisTick, ACCENT, ACCENT_WARNING } from '../utils/chartTheme'
+import { tooltipProps, axisTick, ACCENT, ACCENT_WARNING, ACCENT_INFO, ACCENT_SUCCESS } from '../utils/chartTheme'
+import ChartContainer from '../components/ChartContainer'
+
+// ── Icons ────────────────────────────────────────────────────────────────
+function IconTonnage() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> }
+function IconCost() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> }
+function IconEfficiency() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> }
+function IconFarms() { return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> }
 
 function CostPerTon() {
   const [data, setData] = useState({ by_farm: [], by_variety: [] })
@@ -63,6 +70,25 @@ function CostPerTon() {
 
   const CHART_LIMIT = 10
 
+  const formatNum = (n) => {
+    if (n == null) return '—'
+    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
+    if (n >= 1000) return (n / 1000).toFixed(1) + 'K'
+    return n.toFixed(0)
+  }
+
+  const renderCustomBarLabel = ({ x, y, width, height, value }) => (
+    <text 
+      x={x + width + 10} 
+      y={y + height / 2} 
+      fill="var(--text-muted)" 
+      dominantBaseline="middle"
+      style={{ fontSize: '0.75rem', fontWeight: '600' }}
+    >
+      {value.toFixed(1)}
+    </text>
+  )
+
   // ── 6.9 Farm chart data ───────────────────────────────────────────────────
   const farmChartData = (showAllFarms ? farmData : farmData.slice(0, CHART_LIMIT))
     .map((d) => ({
@@ -79,75 +105,64 @@ function CostPerTon() {
       aboveAvg: d.cost_per_ton > avgVarietyCost,
     }))
 
-  const formatNum = (n) => {
-    if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M'
-    if (n >= 1000) return (n / 1000).toFixed(1) + 'K'
-    return n.toFixed(0)
-  }
-
   return (
     <div className="page">
-      <h2>📈 Cost per Ton Analysis</h2>
+      <div className="page-header">
+        <h2>📈 Cost Efficiency Analysis</h2>
+        <p className="subtitle">Ranking farms and varieties by cost per ton produced</p>
+      </div>
 
       {/* Summary Metrics */}
       <div className="metrics">
-        <div className="metric">
-          <span className="label">Total Tonnage</span>
+        <div className="metric" style={{ borderLeft: '4px solid var(--accent-info)' }}>
+          <div className="metric-header"><IconTonnage /> <span className="label">Total Volume</span></div>
           <span className="value">{formatNum(totalTonnage)} kg</span>
         </div>
-        <div className="metric">
-          <span className="label">Total Cost</span>
+        <div className="metric" style={{ borderLeft: '4px solid var(--accent-warning)' }}>
+          <div className="metric-header"><IconCost /> <span className="label">Total Cost</span></div>
           <span className="value">{formatNum(totalCost)} MAD</span>
         </div>
-        <div className="metric">
-          <span className="label">Weighted Avg Cost/Ton</span>
-          <span className="value">{formatNum(avgCostPerTon)} MAD</span>
+        <div className="metric" style={{ borderLeft: '4px solid var(--accent)' }}>
+          <div className="metric-header"><IconEfficiency /> <span className="label">Avg Cost/Ton</span></div>
+          <span className="value">{avgCostPerTon.toFixed(2)} MAD</span>
         </div>
-        <div className="metric">
-          <span className="label">Farms Analyzed</span>
-          <span className="value">{farmData.length}</span>
+        <div className="metric" style={{ borderLeft: '4px solid var(--accent-success)' }}>
+          <div className="metric-header"><IconFarms /> <span className="label">Farms</span></div>
+          <span className="value">{farmData.length} Analyzed</span>
         </div>
       </div>
 
       {/* Best / Worst Highlight Cards */}
       {bestFarm && worstFarm && (
         <div className="charts-grid" style={{ marginBottom: '30px' }}>
-          <div className="chart" style={{ borderLeft: '4px solid var(--accent)' }}>
-            <h3 style={{ color: 'var(--accent)' }}>🏆 Most Efficient Farm</h3>
+          <div className="chart" style={{ borderLeft: '4px solid var(--accent-success)' }}>
+            <h3 style={{ color: 'var(--accent-success)', marginTop: 0 }}>🏆 Efficiency Leader</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>{bestFarm.Domaine}</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: '800', fontFamily: 'var(--font-heading)' }}>{bestFarm.Domaine}</div>
               <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
                 <div>
-                  <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Cost/Ton</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent)', fontFamily: 'var(--font-heading)' }}>{bestFarm.cost_per_ton.toFixed(2)} MAD</div>
+                  <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Cost/Ton</span>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent-success)' }}>{bestFarm.cost_per_ton.toFixed(2)} MAD</div>
                 </div>
                 <div>
-                  <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Tonnage</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{formatNum(bestFarm.total_tonnage)} kg</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Total Cost</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{formatNum(bestFarm.total_cost)} MAD</div>
+                  <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Output</span>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '600' }}>{formatNum(bestFarm.total_tonnage)} kg</div>
                 </div>
               </div>
             </div>
           </div>
           <div className="chart" style={{ borderLeft: '4px solid var(--accent-warning)' }}>
-            <h3 style={{ color: 'var(--accent-warning)' }}>⚠️ Least Efficient Farm</h3>
+            <h3 style={{ color: 'var(--accent-warning)', marginTop: 0 }}>⚠️ Optimization Required</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '15px' }}>
-              <div style={{ fontSize: '1.6rem', fontWeight: '700', fontFamily: 'var(--font-heading)' }}>{worstFarm.Domaine}</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: '800', fontFamily: 'var(--font-heading)' }}>{worstFarm.Domaine}</div>
               <div style={{ display: 'flex', gap: '30px', flexWrap: 'wrap' }}>
                 <div>
-                  <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Cost/Ton</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent-warning)', fontFamily: 'var(--font-heading)' }}>{worstFarm.cost_per_ton.toFixed(2)} MAD</div>
+                  <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Cost/Ton</span>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '700', color: 'var(--accent-warning)' }}>{worstFarm.cost_per_ton.toFixed(2)} MAD</div>
                 </div>
                 <div>
-                  <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Tonnage</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{formatNum(worstFarm.total_tonnage)} kg</div>
-                </div>
-                <div>
-                  <span style={{ fontSize: '0.8rem', textTransform: 'uppercase', letterSpacing: '1px', color: 'var(--text-muted)' }}>Total Cost</span>
-                  <div style={{ fontSize: '1.4rem', fontWeight: '600', fontFamily: 'var(--font-heading)' }}>{formatNum(worstFarm.total_cost)} MAD</div>
+                  <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>Output</span>
+                  <div style={{ fontSize: '1.4rem', fontWeight: '600' }}>{formatNum(worstFarm.total_tonnage)} kg</div>
                 </div>
               </div>
             </div>
@@ -157,166 +172,72 @@ function CostPerTon() {
 
       {/* Charts Grid */}
       <div className="charts-grid">
-        {/* 6.9 Cost/Ton by Farm */}
-        <div className="chart">
-          <h3>
-            Cost/Ton by Farm (MAD)
-            {!showAllFarms && farmData.length > CHART_LIMIT ? ` — Top ${CHART_LIMIT}` : ''}
-          </h3>
-          {farmChartData.length > 0 && (
-            <ResponsiveContainer width="100%" height={Math.max(200, farmChartData.length * 36)}>
-              <BarChart
-                data={farmChartData}
-                layout="vertical"
-                margin={{ top: 4, right: 24, left: 8, bottom: 4 }}
-              >
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={140}
-                  tick={axisTick}
-                />
-                <Tooltip
-                  {...tooltipProps}
-                  formatter={(v) => [v.toFixed(2) + ' MAD', 'Cost/Ton']}
-                />
-                <Bar
-                  dataKey="value"
-                  radius={[0, 6, 6, 0]}
-                  style={{ cursor: 'pointer' }}
-                  onClick={(entry) => navigate(`/domain/${encodeURIComponent(entry.name)}`)}
-                >
-                  {farmChartData.map((entry, i) => (
-                    <Cell key={i} fill={entry.aboveAvg ? ACCENT_WARNING : ACCENT} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+        <ChartContainer title="Cost per Ton by Farm (MAD)" data={farmChartData} filename="cost_per_ton_farm">
+          <ResponsiveContainer width="100%" height={Math.max(300, farmChartData.length * 40)}>
+            <BarChart data={farmChartData} layout="vertical" margin={{ top: 10, right: 60, left: 20, bottom: 10 }}>
+              <XAxis type="number" hide />
+              <YAxis type="category" dataKey="name" width={140} tick={axisTick} axisLine={false} tickLine={false} />
+              <Tooltip {...tooltipProps} formatter={(v) => [v.toFixed(2) + ' MAD', 'Cost/Ton']} />
+              <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={20} label={renderCustomBarLabel} onClick={(e) => navigate(`/domain/${encodeURIComponent(e.name)}`)}>
+                {farmChartData.map((entry, i) => <Cell key={i} fill={entry.aboveAvg ? ACCENT_WARNING : ACCENT_SUCCESS} style={{ cursor: 'pointer' }} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
           {farmData.length > CHART_LIMIT && (
-            <button
-              onClick={() => setShowAllFarms(!showAllFarms)}
-              style={{
-                marginTop: '16px', background: 'none', border: '1px solid var(--border)',
-                color: 'var(--accent)', padding: '8px 16px', borderRadius: '8px',
-                cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', fontFamily: 'inherit',
-                transition: 'all 0.2s'
-              }}
-            >
+            <button className="expand-btn" onClick={() => setShowAllFarms(!showAllFarms)}>
               {showAllFarms ? 'Show Less' : `Show All ${farmData.length} Farms`}
             </button>
           )}
-        </div>
+        </ChartContainer>
 
-        {/* 6.10 Cost/Ton by Variety */}
-        <div className="chart">
-          <h3>
-            Cost/Ton by Variety (MAD)
-            {!showAllVarieties && varietyAgg.length > CHART_LIMIT ? ` — Top ${CHART_LIMIT}` : ''}
-          </h3>
-          {varietyChartData.length > 0 && (
-            <ResponsiveContainer width="100%" height={Math.max(200, varietyChartData.length * 36)}>
-              <BarChart
-                data={varietyChartData}
-                layout="vertical"
-                margin={{ top: 4, right: 24, left: 8, bottom: 4 }}
-              >
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  width={140}
-                  tick={axisTick}
-                />
-                <Tooltip
-                  {...tooltipProps}
-                  formatter={(v) => [v.toFixed(2) + ' MAD', 'Cost/Ton']}
-                />
-                <Bar dataKey="value" radius={[0, 6, 6, 0]}>
-                  {varietyChartData.map((entry, i) => (
-                    <Cell key={i} fill={entry.aboveAvg ? ACCENT_WARNING : ACCENT} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
+        <ChartContainer title="Cost per Ton by Variety (MAD)" data={varietyChartData} filename="cost_per_ton_variety">
+          <ResponsiveContainer width="100%" height={Math.max(300, varietyChartData.length * 40)}>
+            <BarChart data={varietyChartData} layout="vertical" margin={{ top: 10, right: 60, left: 20, bottom: 10 }}>
+              <XAxis type="number" hide />
+              <YAxis type="category" dataKey="name" width={140} tick={axisTick} axisLine={false} tickLine={false} />
+              <Tooltip {...tooltipProps} formatter={(v) => [v.toFixed(2) + ' MAD', 'Cost/Ton']} />
+              <Bar dataKey="value" radius={[0, 10, 10, 0]} barSize={20} label={renderCustomBarLabel}>
+                {varietyChartData.map((entry, i) => <Cell key={i} fill={entry.aboveAvg ? ACCENT_WARNING : ACCENT_INFO} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
           {varietyAgg.length > CHART_LIMIT && (
-            <button
-              onClick={() => setShowAllVarieties(!showAllVarieties)}
-              style={{
-                marginTop: '16px', background: 'none', border: '1px solid var(--border)',
-                color: 'var(--accent)', padding: '8px 16px', borderRadius: '8px',
-                cursor: 'pointer', fontSize: '0.85rem', fontWeight: '600', fontFamily: 'inherit',
-                transition: 'all 0.2s'
-              }}
-            >
+            <button className="expand-btn" onClick={() => setShowAllVarieties(!showAllVarieties)}>
               {showAllVarieties ? 'Show Less' : `Show All ${varietyAgg.length} Varieties`}
             </button>
           )}
-        </div>
+        </ChartContainer>
       </div>
 
-      {/* Farm Details Table */}
+      {/* Tables */}
       <div style={{ marginTop: '50px' }}>
-        <h3>Farm Analytics Breakdown</h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Farm</th>
-                <th>Tonnage (kg)</th>
-                <th>Total Cost (MAD)</th>
-                <th>Superficie (ha)</th>
-                <th>Cost/Ton (MAD)</th>
-                <th>Cost/Ha (MAD)</th>
+        <h3>Detailed Cost Analytics Breakdown</h3>
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Farm</th>
+              <th>Tonnage (kg)</th>
+              <th>Total Cost (MAD)</th>
+              <th>Superficie (ha)</th>
+              <th>Cost/Ton (MAD)</th>
+              <th>Cost/Ha (MAD)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {farmData.map((d, i) => (
+              <tr key={i} className="clickable-row" onClick={() => navigate(`/domain/${encodeURIComponent(d.Domaine)}`)}>
+                <td><span className="farm-link">{d.Domaine}</span></td>
+                <td style={{ fontWeight: '600' }}>{d.total_tonnage?.toLocaleString()}</td>
+                <td>{d.total_cost?.toLocaleString()}</td>
+                <td>{d.superficie?.toFixed(2)}</td>
+                <td style={{ color: d.cost_per_ton > avgCostPerTon ? 'var(--accent-warning)' : 'var(--accent-success)', fontWeight: 'bold' }}>
+                  {d.cost_per_ton?.toFixed(2)}
+                </td>
+                <td>{d.cost_per_ha?.toFixed(0)}</td>
               </tr>
-            </thead>
-            <tbody>
-              {farmData.map((d, i) => (
-                <tr key={i} className="clickable-row" onClick={() => navigate(`/domain/${encodeURIComponent(d.Domaine)}`)}>
-                  <td><span className="farm-link">{d.Domaine}</span></td>
-                  <td>{d.total_tonnage?.toLocaleString()}</td>
-                  <td>{d.total_cost?.toLocaleString()}</td>
-                  <td>{d.superficie?.toFixed(2)}</td>
-                  <td style={{ color: d.cost_per_ton > avgCostPerTon ? 'var(--accent-warning)' : 'var(--accent)', fontWeight: 'bold' }}>
-                    {d.cost_per_ton?.toFixed(2)}
-                  </td>
-                  <td>{d.cost_per_ha?.toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Variety Summary Table */}
-      <div style={{ marginTop: '50px' }}>
-        <h3>Variety Cost Summary (Aggregated)</h3>
-        <div style={{ overflowX: 'auto' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Variety</th>
-                <th>Total Tonnage (kg)</th>
-                <th>Weighted Avg Cost/Ton (MAD)</th>
-                <th>Farms Growing</th>
-              </tr>
-            </thead>
-            <tbody>
-              {varietyAgg.map((d, i) => (
-                <tr key={i}>
-                  <td><strong>{d.variety}</strong></td>
-                  <td>{d.total_tonnage?.toLocaleString()}</td>
-                  <td style={{ color: d.cost_per_ton > avgVarietyCost ? 'var(--accent-warning)' : 'var(--accent)', fontWeight: 'bold' }}>
-                    {d.cost_per_ton?.toFixed(2)}
-                  </td>
-                  <td>{d.farm_count}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   )

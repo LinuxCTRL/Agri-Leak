@@ -2,9 +2,11 @@ import pandas as pd
 from pathlib import Path
 import datetime
 import json
+import re
 
 DATA_DIR = Path("data")
 PROCESSED_DIR = Path("data/processed")
+EXPORT_TONNAGE_DIR = DATA_DIR / "export-tonnage"
 
 
 def calculate_qnz(date):
@@ -44,7 +46,7 @@ def parse_qnz_number(filename):
     return int(match.group(1)) if match else None
 
 
-def normalize_farm_name(name, mapping):
+def normalize_name(name, mapping):
     if not name or not isinstance(name, str):
         return name
     name = name.strip()
@@ -53,7 +55,7 @@ def normalize_farm_name(name, mapping):
     return name
 
 
-def ingest_tonnage_file(file_path, qnz_num, mapping):
+def ingest_tonnage_file(file_path, qnz_num, farm_mapping, variety_mapping):
     """Ingest tonnage data from a single Excel file."""
     xls = pd.ExcelFile(file_path)
     # Find the sheet that starts with "SUIVI JOUR"
@@ -74,8 +76,8 @@ def ingest_tonnage_file(file_path, qnz_num, mapping):
         group = row.get("GROUPE")
         club = row.get("CLUBS")
         code = row.get("CODE")
-        ferme = normalize_farm_name(row.get("FERME"), mapping)
-        variety = row.get("VARIETE")
+        ferme = normalize_name(row.get("FERME"), farm_mapping)
+        variety = normalize_name(row.get("VARIETE"), variety_mapping)
         type_cult = row.get("TYPE")
         serre = row.get("SERRE N°")
         superficie = row.get("SUP")
@@ -118,16 +120,93 @@ def ingest_tonnage_file(file_path, qnz_num, mapping):
     return pd.DataFrame(records)
 
 
+def parse_export_qnz(filename):
+    """Extract QNZ number from export filename like 'Tonnage Q21 - Export.xlsx'"""
+    match = re.search(r"Q(\d+)", filename, re.IGNORECASE)
+    return int(match.group(1)) if match else None
+
+
+def ingest_export_tonnage_file(file_path, qnz_num, farm_mapping, variety_mapping):
+    """Ingest export tonnage data - these have fortnight-level aggregates."""
+    df = pd.read_excel(file_path)
+    
+    if df.empty:
+        return pd.DataFrame()
+    
+    # Convert superficie to numeric, coerce errors to NaN
+    df["Superficie actuelle"] = pd.to_numeric(df["Superficie actuelle"], errors="coerce")
+    # Convert all text columns to string to avoid parquet mixed-type errors
+    for col in df.columns:
+        if df[col].dtype == "object":
+            df[col] = df[col].fillna("").astype(str)
+    
+    records = []
+    for _, row in df.iterrows():
+        ferme = normalize_name(row.get("Domaine"), farm_mapping)
+        variety = normalize_name(row.get("Variété"), variety_mapping)
+        
+        plant_date_raw = row.get("Date plantation")
+        plant_date = None
+        if pd.notna(plant_date_raw):
+            try:
+                plant_date = pd.to_datetime(plant_date_raw)
+            except:
+                plant_date = None
+        
+        qnz = qnz_num
+        year_start = plant_date.year if plant_date else None
+        year_end = year_start + 1 if year_start else None
+        
+        records.append({
+            "group": None,  # Will be looked up from existing data
+            "club": None,
+            "code": None,
+            "ferme": ferme,
+            "variety": variety,
+            "type": row.get("Type"),
+            "serre": str(row.get("Serre")) if pd.notna(row.get("Serre")) else None,
+            "superficie": row.get("Superficie actuelle"),
+            "plant_date": plant_date,
+            "date": plant_date,
+            "qnz": qnz,
+            "year_start": year_start,
+            "year_end": year_end,
+            "tonnage": row.get("Tonnage total"),
+            "tonnage_qnz": row.get("Total / quinzaine"),
+            "tonnage_ha": row.get("Tonnage/ha"),
+            "export_qnz": row.get("Export quinzaine"),
+            "export_total": row.get("Export total"),
+            "export_ha": row.get("Export/Ha"),
+            "export_total_all": row.get("Total export (Export + Export local)"),
+            "ecart_total": row.get("Ecart total"),
+            "ecart_ha": row.get("Ecart/Ha"),
+            "ecart_pct": row.get("% Ecart"),
+            "superficie_total": row.get("Superficie total"),
+            "plantation_week": row.get("Semaine de plantation"),
+            "source": "export"
+        })
+    
+    return pd.DataFrame(records)
+
+
 def ingest_tonnage():
     """Ingest tonnage data from all QNZ Excel files."""
-    # Load mapping
-    mapping_path = Path("backend/farm_mapping.json")
-    mapping = {}
-    if mapping_path.exists():
-        with open(mapping_path, "r") as f:
-            mapping = json.load(f)
+    # Load mappings
+    farm_mapping_path = Path("backend/farm_mapping.json")
+    farm_mapping = {}
+    if farm_mapping_path.exists():
+        with open(farm_mapping_path, "r") as f:
+            farm_mapping = json.load(f)
             # Ensure keys are stripped for matching
-            mapping = {k.strip(): v for k, v in mapping.items()}
+            farm_mapping = {k.strip(): v for k, v in farm_mapping.items()}
+
+    variety_mapping_path = Path("backend/variety_mapping.json")
+    variety_mapping = {}
+    if variety_mapping_path.exists():
+        with open(variety_mapping_path, "r") as f:
+            variety_mapping = json.load(f)
+            # Ensure keys are stripped for matching
+            variety_mapping = {k.strip(): v for k, v in variety_mapping.items()}
 
     all_files = list(DATA_DIR.glob("*QNZ*.xlsx"))
     all_files.sort(key=lambda f: parse_qnz_number(f.name) or 0)
@@ -140,12 +219,28 @@ def ingest_tonnage():
     for file_path in all_files:
         qnz_num = parse_qnz_number(file_path.name)
         print(f"Processing {file_path.name} (QNZ {qnz_num})...")
-        df = ingest_tonnage_file(file_path, qnz_num, mapping)
+        df = ingest_tonnage_file(file_path, qnz_num, farm_mapping, variety_mapping)
         if not df.empty:
             all_dfs.append(df)
 
     if not all_dfs:
         return pd.DataFrame()
+
+    # Also process export-tonnage files if directory exists
+    export_dfs = []
+    if EXPORT_TONNAGE_DIR.exists():
+        export_files = list(EXPORT_TONNAGE_DIR.glob("*.xlsx"))
+        for file_path in export_files:
+            qnz_num = parse_export_qnz(file_path.name)
+            print(f"Processing export {file_path.name} (QNZ {qnz_num})...")
+            df = ingest_export_tonnage_file(file_path, qnz_num, farm_mapping, variety_mapping)
+            if not df.empty:
+                export_dfs.append(df)
+    
+    if export_dfs:
+        df_export = pd.concat(export_dfs, ignore_index=True)
+        all_dfs.append(df_export)
+        print(f"Added {len(df_export)} export rows")
 
     df_tonnage = pd.concat(all_dfs, ignore_index=True)
     
@@ -161,10 +256,30 @@ def ingest_tonnage():
     # Merge the normalized metadata back into the main dataframe
     df_tonnage = df_tonnage.drop(columns=["group", "club", "code"])
     df_tonnage = pd.merge(df_tonnage, metadata, on="ferme", how="left")
+    
+    # For export rows, lookup group/club/code from existing data
+    export_mask = df_tonnage["source"] == "export"
+    if export_mask.any():
+        # Get metadata from non-export rows for same farms
+        existing_metadata = df_tonnage[~export_mask][["ferme", "group", "club", "code"]].drop_duplicates()
+        existing_metadata = existing_metadata.rename(columns={
+            "group": "group_lookup", "club": "club_lookup", "code": "code_lookup"
+        })
+        # Merge and replace
+        df_tonnage = df_tonnage.merge(existing_metadata, on="ferme", how="left")
+        df_tonnage.loc[export_mask, "group"] = df_tonnage.loc[export_mask, "group_lookup"]
+        df_tonnage.loc[export_mask, "club"] = df_tonnage.loc[export_mask, "club_lookup"]
+        df_tonnage.loc[export_mask, "code"] = df_tonnage.loc[export_mask, "code_lookup"]
+        df_tonnage = df_tonnage.drop(columns=["group_lookup", "club_lookup", "code_lookup"])
     # ------------------------------
     
     # Ensure processed directory exists
     PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Convert all object columns to string to avoid parquet mixed-type errors
+    for col in df_tonnage.columns:
+        if df_tonnage[col].dtype == "object":
+            df_tonnage[col] = df_tonnage[col].fillna("").astype(str)
     
     output_path = PROCESSED_DIR / "tonnage_combined.parquet"
     df_tonnage.to_parquet(output_path, engine="pyarrow", index=False)
@@ -212,7 +327,7 @@ def ingest_costs():
         df["quinzaine_type"] = 1
         
         # Normalize farm names
-        df["Domaine"] = df["Domaine"].apply(lambda x: normalize_farm_name(x, mapping))
+        df["Domaine"] = df["Domaine"].apply(lambda x: normalize_name(x, mapping))
 
         all_costs.append(df)
 

@@ -13,7 +13,7 @@ function Topbar({ sidebarWidth }) {
           <div className="topbar-qnz" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ fontSize: '0.8rem', fontWeight: '600', color: 'var(--text-muted)', textTransform: 'uppercase' }}>Period</span>
             <select
-              value={selectedQnz || ''}
+              value={selectedQnz === 0 ? 0 : (selectedQnz || '')}
               onChange={(e) => setSelectedQnz(Number(e.target.value))}
               style={{
                 padding: '6px 32px 6px 12px',
@@ -32,6 +32,7 @@ function Topbar({ sidebarWidth }) {
                 minWidth: '100px'
               }}
             >
+              <option value={0}>All Quinzaines</option>
               {availableQnz.map((q) => (
                 <option key={q} value={q}>
                   QNZ {q}
