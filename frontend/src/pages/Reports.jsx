@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -95,6 +95,78 @@ function ReportsDetail() {
 
   const qnzParam = searchParams.get('qnz')
   const selectedQnz = qnzParam ? parseInt(qnzParam) : 0
+
+  const exportSummary = useMemo(() => {
+    if (!exportData || !Array.isArray(exportData) || exportData.length === 0) return null
+
+    const isAllQnz = selectedQnz === 0
+    
+    // Group by variety to get the latest cumulative values and sum the period values
+    const varietyMap = {}
+    exportData.forEach(r => {
+      const vName = r.variety || 'Unknown'
+      if (!varietyMap[vName]) {
+        varietyMap[vName] = {
+          variety: vName,
+          tonnage_qnz: 0,
+          export_qnz: 0,
+          export_local: 0,
+          latest_qnz: -1,
+          tonnage_cumul: 0,
+          export_total_all: 0,
+          ecart_total: 0,
+          ecart_ha: 0,
+          ecart_pct: 0,
+          count: 0
+        }
+      }
+      const v = varietyMap[vName]
+      v.tonnage_qnz += (r.tonnage_qnz || 0)
+      v.export_qnz += (r.export_qnz || 0)
+      v.export_local += (r.export_local || 0)
+      v.count++
+
+      // For cumulative fields, we want the latest quinzaine's values
+      if (r.qnz > v.latest_qnz) {
+        v.latest_qnz = r.qnz
+        v.tonnage_cumul = (r.tonnage_cumul || 0)
+        v.export_total_all = (r.export_total_all || 0)
+        v.ecart_total = (r.ecart_total || 0)
+        v.ecart_ha = (r.ecart_ha || 0)
+        v.ecart_pct = (r.ecart_pct || 0)
+      }
+    })
+
+    const varieties = Object.values(varietyMap)
+    
+    // Metrics
+    const m = {
+      tonnage_qnz: varieties.reduce((s, v) => s + v.tonnage_qnz, 0),
+      export_qnz: varieties.reduce((s, v) => s + v.export_qnz, 0),
+      export_local: varieties.reduce((s, v) => s + v.export_local, 0),
+      
+      tonnage_cumul: isAllQnz 
+        ? varieties.reduce((s, v) => s + v.tonnage_cumul, 0)
+        : exportData.reduce((s, r) => s + (r.tonnage_cumul || 0), 0),
+        
+      export_total: isAllQnz
+        ? varieties.reduce((s, v) => s + v.export_total_all, 0)
+        : exportData.reduce((s, r) => s + (r.export_total_all || 0), 0),
+        
+      ecart_total: isAllQnz
+        ? varieties.reduce((s, v) => s + v.ecart_total, 0)
+        : exportData.reduce((s, r) => s + (r.ecart_total || 0), 0),
+        
+      avg_ecart_ha: varieties.reduce((s, v) => s + v.ecart_ha, 0) / (varieties.length || 1),
+      avg_ecart_pct: varieties.reduce((s, v) => s + v.ecart_pct, 0) / (varieties.length || 1),
+      varieties_count: varieties.length
+    }
+
+    return {
+      metrics: m,
+      tableData: isAllQnz ? varieties.sort((a, b) => b.tonnage_qnz - a.tonnage_qnz) : exportData
+    }
+  }, [exportData, selectedQnz])
 
   useEffect(() => { loadData() }, [ferme, selectedQnz])
 
@@ -209,33 +281,6 @@ function ReportsDetail() {
         </div>
 
         {/* AI Summary Section */}
-        {(aiLoading || aiSummary || aiError) && (
-          <div className={`ai-summary-card ${(aiLoading || aiError) ? 'no-print' : ''}`}>
-            <div className="ai-summary-header">
-              <IconSparkles />
-              <span className="ai-summary-title">AI Executive Summary</span>
-            </div>
-            
-            {aiLoading && (
-              <div className="ai-summary-loading">
-                <div className="loading-spinner" style={{ width: '20px', height: '20px', borderWidth: '2px' }}></div>
-                Analyzing farm performance data...
-              </div>
-            )}
-            
-            {aiError && (
-              <div className="ai-summary-error">
-                {aiError}
-              </div>
-            )}
-            
-            {aiSummary && (
-              <div className="ai-summary-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>{aiSummary}</ReactMarkdown>
-              </div>
-            )}
-          </div>
-        )}
 
         <section className="report-section">
           <h2 className="report-section-title">1. Production Overview</h2>
@@ -281,30 +326,33 @@ function ReportsDetail() {
         </section>
         )}
 
-        {exportData && Array.isArray(exportData) && exportData.length > 0 && (
+        {exportSummary && (
         <section className="report-section">
           <h2 className="report-section-title">3. Export Tonnage (Export Data)</h2>
           <div className="metrics">
-            <div className="metric" style={{ borderLeft: '4px solid #3b82f6' }}><div className="metric-header"><IconTonnage /> <span className="label">Total / Quinzaine</span></div><span className="value">{exportData.reduce((s, r) => s + (r.tonnage_qnz || 0), 0).toLocaleString()} kg</span></div>
-            <div className="metric" style={{ borderLeft: '4px solid #10b981' }}><div className="metric-header"><IconTonnage /> <span className="label">Tonnage Cumulé</span></div><span className="value">{exportData.reduce((s, r) => s + (r.tonnage_cumul || 0), 0).toLocaleString()} kg</span></div>
-            <div className="metric" style={{ borderLeft: '4px solid #f59e0b' }}><div className="metric-header"><IconTonnage /> <span className="label">Export Total</span></div><span className="value">{exportData.reduce((s, r) => s + (r.export_cumul || 0), 0).toLocaleString()} kg</span></div>
-            <div className="metric" style={{ borderLeft: '4px solid #8b5cf6' }}><div className="metric-header"><IconTonnage /> <span className="label">Export Local</span></div><span className="value">{exportData.reduce((s, r) => s + (r.export_local || 0), 0).toLocaleString()} kg</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #3b82f6' }}><div className="metric-header"><IconTonnage /> <span className="label">Total / Quinzaine</span></div><span className="value">{exportSummary.metrics.tonnage_qnz.toLocaleString()} kg</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #06b6d4' }}><div className="metric-header"><IconTonnage /> <span className="label">Export Quinzaine</span></div><span className="value">{exportSummary.metrics.export_qnz.toLocaleString()} kg</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #8b5cf6' }}><div className="metric-header"><IconTonnage /> <span className="label">Export Local</span></div><span className="value">{exportSummary.metrics.export_local.toLocaleString()} kg</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #f59e0b' }}><div className="metric-header"><IconTonnage /> <span className="label">Export Total</span></div><span className="value">{exportSummary.metrics.export_total.toLocaleString()} kg</span></div>
           </div>
           <div className="metrics" style={{ marginTop: '10px' }}>
-            <div className="metric" style={{ borderLeft: '4px solid #ef4444' }}><div className="metric-header"><IconTonnage /> <span className="label">Écart Total</span></div><span className="value">{exportData.reduce((s, r) => s + (r.ecart_total || 0), 0).toLocaleString()} kg</span></div>
-            <div className="metric" style={{ borderLeft: '4px solid #f97316' }}><div className="metric-header"><IconTonnage /> <span className="label">Avg Écart/Ha</span></div><span className="value">{exportData.length > 0 ? (exportData.reduce((s, r) => s + (r.ecart_ha || 0), 0) / exportData.length).toFixed(0) : 0} kg/ha</span></div>
-            <div className="metric" style={{ borderLeft: '4px solid #14b8a6' }}><div className="metric-header"><IconTonnage /> <span className="label">Avg Écart %</span></div><span className="value">{exportData.length > 0 ? ((exportData.reduce((s, r) => s + (r.ecart_pct || 0), 0) / exportData.length) * 100).toFixed(1) : 0}%</span></div>
-            <div className="metric" style={{ borderLeft: '4px solid #ec4899' }}><div className="metric-header"><IconArea /> <span className="label">Varieties</span></div><span className="value">{new Set(exportData.map(r => r.variety)).size}</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #10b981' }}><div className="metric-header"><IconTonnage /> <span className="label">Tonnage Cumulé</span></div><span className="value">{exportSummary.metrics.tonnage_cumul.toLocaleString()} kg</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #ef4444' }}><div className="metric-header"><IconTonnage /> <span className="label">Écart Total</span></div><span className="value">{exportSummary.metrics.ecart_total.toLocaleString()} kg</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #f97316' }}><div className="metric-header"><IconTonnage /> <span className="label">Avg Écart/Ha</span></div><span className="value">{exportSummary.metrics.avg_ecart_ha.toFixed(0)} kg/ha</span></div>
+            <div className="metric" style={{ borderLeft: '4px solid #14b8a6' }}><div className="metric-header"><IconTonnage /> <span className="label">Avg Écart %</span></div><span className="value">{(exportSummary.metrics.avg_ecart_pct * 100).toFixed(1)}%</span></div>
+          </div>
+          <div className="metrics" style={{ marginTop: '10px' }}>
+            <div className="metric" style={{ borderLeft: '4px solid #ec4899' }}><div className="metric-header"><IconArea /> <span className="label">Varieties</span></div><span className="value">{exportSummary.metrics.varieties_count}</span></div>
           </div>
           <div className="chart" style={{ marginTop: '20px', width: '100%', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
             <table className="data-table" style={{ width: '100%', fontSize: '0.8rem', minWidth: '700px' }}>
-              <thead><tr><th>Variety</th><th>Tonnage QNZ</th><th>Tonnage Cumulé</th><th>Total Export</th><th>Écart %</th></tr></thead>
+              <thead><tr><th>Variety</th><th>Tonnage QNZ</th><th>Export QNZ</th><th>Tonnage Cumulé</th><th>Total Export</th><th>Écart %</th></tr></thead>
               <tbody>
-                {exportData.map((r, i) => (
+                {exportSummary.tableData.map((r, i) => (
                   <tr key={i}>
                     <td><strong>{r.variety}</strong></td>
-                    
                     <td>{r.tonnage_qnz?.toLocaleString()} kg</td>
+                    <td>{r.export_qnz?.toLocaleString()} kg</td>
                     <td>{r.tonnage_cumul?.toLocaleString()} kg</td>
                     <td><strong>{r.export_total_all?.toLocaleString()} kg</strong></td>
                     <td>{r.ecart_pct ? (r.ecart_pct * 100).toFixed(1) + '%' : '—'}</td>
@@ -372,6 +420,7 @@ function ReportsDetail() {
 
         <div className="report-footer">
           <p>Agri-Leak Agricultural Data Lake — Report generated on {reportDate}</p>
+          <p style={{fontSize: "22px", fontWeight: "bold", fontFamily: "var(--font-heading)"}}>Created By Amediaz Soufiane. DIRECTION HORTI</p>
           <p>{qnzLabel} | Farm: {details?.ferme} | Code: {details?.code}</p>
         </div>
       </div>
